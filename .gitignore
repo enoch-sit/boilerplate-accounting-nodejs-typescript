@@ -1,0 +1,42 @@
+combined_files.txt
+# ps1
+*.ps1
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# TypeScript
+*.js
+*.js.map
+*.d.ts
+
+# Environment variables
+.env
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Dependency directories
+bower_components/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.swp
