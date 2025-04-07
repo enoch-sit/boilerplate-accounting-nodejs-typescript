@@ -2,6 +2,13 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
 
+// Define user roles
+export enum UserRole {
+  ADMIN = 'admin',
+  SUPERVISOR = 'supervisor',
+  ENDUSER = 'enduser'
+}
+
 // Defines the structure of a user document in the database
 export interface IUser extends Document {
   _id: Types.ObjectId;
@@ -9,6 +16,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   isVerified: boolean;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -44,6 +52,12 @@ password: {
 isVerified: {
   type: Boolean,
   default: false
+},
+// Role field: defines the user's role in the system, defaults to enduser
+role: {
+  type: String,
+  enum: Object.values(UserRole),
+  default: UserRole.ENDUSER
 }
   },
   {

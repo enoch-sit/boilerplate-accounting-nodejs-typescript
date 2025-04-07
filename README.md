@@ -1,4 +1,4 @@
-# Simple Authentication System with TypeScript and MongoDB
+# Simple Authentication and Accounting System with TypeScript and MongoDB using JWT
 
 A robust authentication system built with TypeScript, Express, and MongoDB. Features include user registration, email verification, JWT authentication, password reset, and protected routes.
 
@@ -10,6 +10,7 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 - **Protected Routes**: Middleware for authenticated endpoints
 - **Password Management**: Secure hashing and reset functionality
 - **Database Integration**: MongoDB for data persistence
+- **Role-Based Access Control**: Admin, Supervisor, and User roles with appropriate permissions
 
 ## API Endpoints
 
@@ -21,7 +22,42 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 | `/api/auth/verify-email` | POST   | Verify email with token      |
 | `/api/profile`           | GET    | Get user profile (Protected) |
 | `/api/reset-password`    | POST   | Reset password with token    |
+| `/api/admin/users`       | GET    | Get all users (Admin only)   |
+| `/api/admin/reports`     | GET    | Access reports (Admin/Supervisor) |
+| `/api/admin/dashboard`   | GET    | Access dashboard (All authenticated users) |
 
+## Testing
+
+### Running Tests
+
+The application includes comprehensive authentication flow tests:
+
+```bash
+npm test
+```
+
+### Testing Without MailHog
+
+By default, the tests use MailHog for email verification and password reset. If MailHog is not working in your development environment, you can use the database bypass method:
+
+1. The tests automatically bypass MailHog and fetch verification tokens directly from the database when `BYPASS_MAILHOG` is set to `true` in the test file.
+
+2. To enable or disable this feature:
+
+```typescript
+// In tests/auth.test.ts
+const BYPASS_MAILHOG = true; // Set to false if you want to use MailHog
+```
+
+3. With bypass enabled, the tests will:
+   - Fetch verification tokens directly from the MongoDB database
+   - Skip all MailHog API calls
+   - Complete the full authentication flow without needing the email service
+
+This approach is useful when:
+- MailHog is not available in your environment
+- You want to run tests faster without email delivery delays
+- Your CI/CD pipeline doesn't include email testing services
 
 ### Setting Up MongoDB on Windows
 

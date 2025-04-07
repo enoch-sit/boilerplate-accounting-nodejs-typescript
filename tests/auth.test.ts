@@ -12,6 +12,9 @@ const MONGODB_URI = 'mongodb://localhost:27017/auth_db';
 // Set to true to enable manual input for verification codes and tokens
 const USE_MANUAL_INPUT = true;
 
+// Set to true to bypass MailHog and get tokens directly from the database
+const BYPASS_MAILHOG = true;
+
 // Increase Jest timeout (longer for manual input)
 jest.setTimeout(USE_MANUAL_INPUT ? 300000 : 60000); // 5 minutes for manual, 1 minute for automatic
 
@@ -23,12 +26,30 @@ const TEST_USER = {
   password: 'Password123!'
 };
 
+// Admin user credentials for role-based access tests
+const ADMIN_USER = {
+  username: `admin_${timestamp}`,
+  email: `admin_${timestamp}@example.com`,
+  password: 'Password123!'
+};
+
+// Supervisor user credentials for role-based access tests
+const SUPERVISOR_USER = {
+  username: `supervisor_${timestamp}`,
+  email: `supervisor_${timestamp}@example.com`,
+  password: 'Password123!'
+};
+
 // Store tokens across tests
 let accessToken: string;
 let refreshToken: string;
 let verificationToken: string;
 let passwordResetToken: string;
 let userId: string;
+
+// Additional tokens for different user roles
+let adminAccessToken: string;
+let supervisorAccessToken: string;
 
 // Create readline interface for user input if manual mode is enabled
 let readline: ReturnType<typeof createInterface> | null = null;
@@ -135,6 +156,11 @@ interface MessagesResponse {
 
 // Function to check if MailHog is running
 async function checkMailHogConnection(): Promise<boolean> {
+  if (BYPASS_MAILHOG) {
+    console.log('MailHog check bypassed');
+    return true;
+  }
+  
   try {
     const response = await axios.get(`${MAILHOG_API}/messages`);
     console.log('MailHog is connected and running');
@@ -164,11 +190,80 @@ async function wait(ms: number): Promise<void> {
 
 // Manually delete all messages
 async function deleteAllMessages(): Promise<void> {
+  if (BYPASS_MAILHOG) {
+    console.log('MailHog message deletion bypassed');
+    return;
+  }
+  
   try {
     await axios.delete(`${MAILHOG_API}/messages`);
     console.log('Deleted all messages from MailHog');
   } catch (error) {
     console.error('Failed to delete messages:', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// Helper function to get verification token directly from the database
+async function getVerificationTokenFromDb(userEmail: string): Promise<string | null> {
+  if (!db) return null;
+  
+  try {
+    // Find the user by email
+    const user = await db.collection('users').findOne({ email: userEmail });
+    if (!user) {
+      console.error(`User with email ${userEmail} not found in database`);
+      return null;
+    }
+    
+    // Find the verification record for this user
+    const verification = await db.collection('verifications').findOne({
+      userId: user._id,
+      type: 'email',
+      expires: { $gt: new Date() }
+    });
+    
+    if (!verification) {
+      console.error(`No valid verification record found for user ${userEmail}`);
+      return null;
+    }
+    
+    console.log(`Found verification token in database: ${verification.token}`);
+    return verification.token;
+  } catch (error) {
+    console.error('Error retrieving verification token from database:', error);
+    return null;
+  }
+}
+
+// Helper function to get password reset token directly from the database
+async function getPasswordResetTokenFromDb(userEmail: string): Promise<string | null> {
+  if (!db) return null;
+  
+  try {
+    // Find the user by email
+    const user = await db.collection('users').findOne({ email: userEmail });
+    if (!user) {
+      console.error(`User with email ${userEmail} not found in database`);
+      return null;
+    }
+    
+    // Find the password reset record for this user
+    const verification = await db.collection('verifications').findOne({
+      userId: user._id,
+      type: 'password-reset',
+      expires: { $gt: new Date() }
+    });
+    
+    if (!verification) {
+      console.error(`No valid password reset record found for user ${userEmail}`);
+      return null;
+    }
+    
+    console.log(`Found password reset token in database: ${verification.token.substring(0, 10)}...`);
+    return verification.token;
+  } catch (error) {
+    console.error('Error retrieving password reset token from database:', error);
+    return null;
   }
 }
 
@@ -300,20 +395,27 @@ beforeAll(async () => {
     await db.collection('users').deleteMany({ email: { $regex: /^testuser_/ } });
   }
   
-  // Verify MailHog connection
-  const mailhogRunning = await checkMailHogConnection();
-  if (!mailhogRunning) {
-    throw new Error('MailHog is not running. Please start MailHog before running tests.');
+  // Verify MailHog connection if not bypassing
+  if (!BYPASS_MAILHOG) {
+    const mailhogRunning = await checkMailHogConnection();
+    if (!mailhogRunning) {
+      throw new Error('MailHog is not running. Please start MailHog before running tests.');
+    }
+    
+    // Clear all emails in MailHog
+    await deleteAllMessages();
   }
-  
-  // Clear all emails in MailHog
-  await deleteAllMessages();
   
   if (USE_MANUAL_INPUT) {
     console.log(`\n====== STARTING INTERACTIVE AUTH TESTS ======`);
     console.log(`Test User: ${TEST_USER.username}`);
     console.log(`Test Email: ${TEST_USER.email}`);
-    console.log(`\nPlease keep MailHog UI open at http://localhost:8025 to view emails\n`);
+    
+    if (!BYPASS_MAILHOG) {
+      console.log(`\nPlease keep MailHog UI open at http://localhost:8025 to view emails\n`);
+    } else {
+      console.log(`\nMailHog is bypassed. Tokens will be fetched directly from database.\n`);
+    }
   }
 });
 
@@ -364,14 +466,30 @@ describe('Authentication Flow Tests', () => {
   test('should receive verification email and verify email', async () => {
     let verificationCode = '';
     
-    // Either get manual input or try automatic extraction
-    if (USE_MANUAL_INPUT) {
+    // Either get manual input, try database extraction, or try automatic extraction
+    if (USE_MANUAL_INPUT && !BYPASS_MAILHOG) {
       console.log('\n📧 Check MailHog UI at http://localhost:8025');
       console.log(`Look for a verification email sent to: ${TEST_USER.email}`);
       console.log('The verification code is typically a 3-character alphanumeric code');
       
       verificationCode = await prompt('\nEnter the verification code from the email: ');
       console.log(`Using verification code: ${verificationCode}`);
+    } else if (BYPASS_MAILHOG) {
+      // Allow some time for the verification record to be created
+      console.log('Waiting for verification record to be created in database...');
+      await wait(2000);
+      
+      // Try to get the token from the database
+      const dbToken = await getVerificationTokenFromDb(TEST_USER.email);
+      
+      if (!dbToken && USE_MANUAL_INPUT) {
+        // If we can't get it from the db, ask the user
+        console.log('\n⚠️ Could not fetch verification code from database.');
+        verificationCode = await prompt('\nPlease enter the verification code manually: ');
+      } else {
+        verificationCode = dbToken || '';
+        console.log(`Using verification code from database: ${verificationCode}`);
+      }
     } else {
       const extractedCode = await autoExtractVerificationCode();
       
@@ -457,8 +575,8 @@ describe('Authentication Flow Tests', () => {
     
     let resetToken = '';
     
-    // Either get manual input or try automatic extraction
-    if (USE_MANUAL_INPUT) {
+    // Either get manual input, try database extraction, or try automatic extraction
+    if (USE_MANUAL_INPUT && !BYPASS_MAILHOG) {
       console.log('\n📧 Check MailHog UI for the password reset email');
       console.log(`Look for a reset email sent to: ${TEST_USER.email}`);
       console.log('Find the reset token in the reset password link');
@@ -466,6 +584,22 @@ describe('Authentication Flow Tests', () => {
       
       resetToken = await prompt('\nEnter the reset token from the email: ');
       console.log(`Using reset token: ${resetToken.substring(0, 10)}...`);
+    } else if (BYPASS_MAILHOG) {
+      // Allow some time for the reset record to be created
+      console.log('Waiting for password reset record to be created in database...');
+      await wait(2000);
+      
+      // Try to get the token from the database
+      const dbToken = await getPasswordResetTokenFromDb(TEST_USER.email);
+      
+      if (!dbToken && USE_MANUAL_INPUT) {
+        // If we can't get it from the db, ask the user
+        console.log('\n⚠️ Could not fetch password reset token from database.');
+        resetToken = await prompt('\nPlease enter the password reset token manually: ');
+      } else {
+        resetToken = dbToken || '';
+        console.log(`Using password reset token from database: ${resetToken.substring(0, 10)}...`);
+      }
     } else {
       const extractedToken = await autoExtractResetToken();
       
@@ -523,5 +657,177 @@ describe('Authentication Flow Tests', () => {
     expect(response.body).toHaveProperty('message', 'Logout successful');
     
     console.log('✅ Logout successful');
+  });
+});
+
+describe('Role-Based Access Control Tests', () => {
+  // Test 1: Register admin user
+  test('should register an admin user', async () => {
+    console.log(`Registering admin user: ${ADMIN_USER.username} with email: ${ADMIN_USER.email}`);
+    
+    const response = await request(API_URL)
+      .post('/auth/signup')
+      .send(ADMIN_USER);
+    
+    expect(response.status).toBe(201);
+    expect(response.body).toHaveProperty('message');
+    expect(response.body).toHaveProperty('userId');
+    
+    console.log('Admin User Sign Up Response:', response.body);
+  });
+  
+  // Test 2: Register supervisor user
+  test('should register a supervisor user', async () => {
+    console.log(`Registering supervisor user: ${SUPERVISOR_USER.username} with email: ${SUPERVISOR_USER.email}`);
+    
+    const response = await request(API_URL)
+      .post('/auth/signup')
+      .send(SUPERVISOR_USER);
+    
+    expect(response.status).toBe(201);
+    expect(response.body).toHaveProperty('message');
+    expect(response.body).toHaveProperty('userId');
+    
+    console.log('Supervisor User Sign Up Response:', response.body);
+  });
+  
+  // Test 3: Verify admin email and login
+  test('should verify admin email and login', async () => {
+    // In a real test, you would verify the admin email here
+    // For this test, we'll manually update the admin user's verification status in the database
+    if (db) {
+      await db.collection('users').updateOne(
+        { email: ADMIN_USER.email },
+        { $set: { isVerified: true, role: 'admin' } }
+      );
+      console.log('✅ Admin user email marked as verified and role set to admin');
+    }
+    
+    // Login with admin credentials
+    const response = await request(API_URL)
+      .post('/auth/login')
+      .send({
+        username: ADMIN_USER.username,
+        password: ADMIN_USER.password
+      });
+    
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('accessToken');
+    expect(response.body).toHaveProperty('refreshToken');
+    expect(response.body.user).toHaveProperty('role', 'admin');
+    
+    adminAccessToken = response.body.accessToken;
+    console.log('✅ Admin login successful');
+  });
+  
+  // Test 4: Verify supervisor email and login
+  test('should verify supervisor email and login', async () => {
+    // In a real test, you would verify the supervisor email here
+    // For this test, we'll manually update the supervisor user's verification status in the database
+    if (db) {
+      await db.collection('users').updateOne(
+        { email: SUPERVISOR_USER.email },
+        { $set: { isVerified: true, role: 'supervisor' } }
+      );
+      console.log('✅ Supervisor user email marked as verified and role set to supervisor');
+    }
+    
+    // Login with supervisor credentials
+    const response = await request(API_URL)
+      .post('/auth/login')
+      .send({
+        username: SUPERVISOR_USER.username,
+        password: SUPERVISOR_USER.password
+      });
+    
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('accessToken');
+    expect(response.body).toHaveProperty('refreshToken');
+    expect(response.body.user).toHaveProperty('role', 'supervisor');
+    
+    supervisorAccessToken = response.body.accessToken;
+    console.log('✅ Supervisor login successful');
+  });
+  
+  // Test 5: Test admin access to admin-only routes
+  test('should allow admin access to admin-only routes', async () => {
+    const response = await request(API_URL)
+      .get('/admin/users')
+      .set('Authorization', `Bearer ${adminAccessToken}`);
+    
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('users');
+    console.log('✅ Admin successfully accessed admin-only route');
+  });
+  
+  // Test 6: Test regular user access to admin-only routes (should be denied)
+  test('should deny regular user access to admin-only routes', async () => {
+    const response = await request(API_URL)
+      .get('/admin/users')
+      .set('Authorization', `Bearer ${accessToken}`);
+    
+    expect(response.status).toBe(403);
+    console.log('✅ Regular user correctly denied access to admin-only route');
+  });
+  
+  // Test 7: Test supervisor access to supervisor routes
+  test('should allow supervisor access to supervisor routes', async () => {
+    const response = await request(API_URL)
+      .get('/admin/reports')
+      .set('Authorization', `Bearer ${supervisorAccessToken}`);
+    
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Reports accessed successfully');
+    console.log('✅ Supervisor successfully accessed supervisor route');
+  });
+  
+  // Test 8: Test admin access to supervisor routes (should be allowed)
+  test('should allow admin access to supervisor routes', async () => {
+    const response = await request(API_URL)
+      .get('/admin/reports')
+      .set('Authorization', `Bearer ${adminAccessToken}`);
+    
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('message', 'Reports accessed successfully');
+    console.log('✅ Admin successfully accessed supervisor route');
+  });
+  
+  // Test 9: Test regular user access to supervisor routes (should be denied)
+  test('should deny regular user access to supervisor routes', async () => {
+    const response = await request(API_URL)
+      .get('/admin/reports')
+      .set('Authorization', `Bearer ${accessToken}`);
+    
+    expect(response.status).toBe(403);
+    console.log('✅ Regular user correctly denied access to supervisor route');
+  });
+  
+  // Test 10: Test all users access to enduser routes
+  test('should allow all users access to enduser routes', async () => {
+    // Test regular user access
+    const regularResponse = await request(API_URL)
+      .get('/admin/dashboard')
+      .set('Authorization', `Bearer ${accessToken}`);
+    
+    expect(regularResponse.status).toBe(200);
+    expect(regularResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    
+    // Test supervisor access
+    const supervisorResponse = await request(API_URL)
+      .get('/admin/dashboard')
+      .set('Authorization', `Bearer ${supervisorAccessToken}`);
+    
+    expect(supervisorResponse.status).toBe(200);
+    expect(supervisorResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    
+    // Test admin access
+    const adminResponse = await request(API_URL)
+      .get('/admin/dashboard')
+      .set('Authorization', `Bearer ${adminAccessToken}`);
+    
+    expect(adminResponse.status).toBe(200);
+    expect(adminResponse.body).toHaveProperty('message', 'User dashboard accessed successfully');
+    
+    console.log('✅ All user types successfully accessed enduser route');
   });
 });

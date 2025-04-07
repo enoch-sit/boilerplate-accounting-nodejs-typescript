@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { tokenService } from './token.service';
 import { logger } from '../utils/logger';
+import { UserRole } from '../models/user.model';
 
 declare global {
   namespace Express {
@@ -9,6 +10,7 @@ declare global {
       user?: {
         userId: string;
         username: string;
+        role: UserRole;
       };
     }
   }
@@ -43,10 +45,11 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     
-    // Attach user info to request
+    // Attach user info to request including role
     req.user = {
       userId: decoded.sub,
-      username: decoded.username
+      username: decoded.username,
+      role: decoded.role
     };
     
     next();
@@ -79,10 +82,11 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction) =>
       const decoded = tokenService.verifyAccessToken(token);
       
       if (decoded) {
-        // Attach user info to request
+        // Attach user info to request including role
         req.user = {
           userId: decoded.sub,
-          username: decoded.username
+          username: decoded.username,
+          role: decoded.role
         };
       }
     }
@@ -92,4 +96,34 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction) =>
     // Just continue without authentication
     next();
   }
+};
+
+/**
+ * Middleware to restrict access to admin users only
+ */
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  if (req.user.role !== UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  next();
+};
+
+/**
+ * Middleware to restrict access to supervisors and admins
+ */
+export const requireSupervisor = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  if (req.user.role !== UserRole.SUPERVISOR && req.user.role !== UserRole.ADMIN) {
+    return res.status(403).json({ error: 'Supervisor access required' });
+  }
+  
+  next();
 };

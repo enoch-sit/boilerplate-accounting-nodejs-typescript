@@ -3,11 +3,13 @@ import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import { Token } from '../models/token.model';
 import { Types } from 'mongoose';
 import { logger } from '../utils/logger';
+import { UserRole } from '../models/user.model';
 
 export interface TokenPayload {
   sub: string;
   username: string;
   type: 'access' | 'refresh';
+  role: UserRole;
 }
 
 /**
@@ -21,9 +23,10 @@ export class TokenService {
    * 
    * @param userId - The unique identifier of the user.
    * @param username - The username of the user.
+   * @param role - The role of the user.
    * @returns A JWT access token string.
    */
-  generateAccessToken(userId: string, username: string): string {
+  generateAccessToken(userId: string, username: string, role: UserRole): string {
     // Retrieve the secret key for access tokens from environment variables or use a default value
     const secretString = process.env.JWT_ACCESS_SECRET || 'access_secret';
     // Convert the secret string to a Buffer for use with JWT
@@ -32,7 +35,7 @@ export class TokenService {
     const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
     
     // Create the payload for the access token
-    const payload: TokenPayload = { sub: userId, username, type: 'access' };
+    const payload: TokenPayload = { sub: userId, username, type: 'access', role };
     // Set the expiration option for the JWT
     const options = { expiresIn } as jwt.SignOptions;
     
@@ -45,9 +48,10 @@ export class TokenService {
    * 
    * @param userId - The unique identifier of the user.
    * @param username - The username of the user.
+   * @param role - The role of the user.
    * @returns A Promise that resolves to a JWT refresh token string.
    */
-  async generateRefreshToken(userId: string, username: string): Promise<string> {
+  async generateRefreshToken(userId: string, username: string, role: UserRole): Promise<string> {
     // Retrieve the secret key for refresh tokens from environment variables or use a default value
     const secretString = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
     // Convert the secret string to a Buffer for use with JWT
@@ -63,7 +67,7 @@ export class TokenService {
     const expires = new Date(Date.now() + expiresInMs);
     
     // Create the payload for the refresh token
-    const payload: TokenPayload = { sub: userId, username, type: 'refresh' };
+    const payload: TokenPayload = { sub: userId, username, type: 'refresh', role };
     // Set the expiration option for the JWT
     const options = { expiresIn } as jwt.SignOptions;
     

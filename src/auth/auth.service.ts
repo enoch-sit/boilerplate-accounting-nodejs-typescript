@@ -1,6 +1,6 @@
 // src/auth/auth.service.ts
 import crypto from 'crypto';
-import { User, IUser } from '../models/user.model';
+import { User, IUser, UserRole } from '../models/user.model';
 import { Verification, VerificationType } from '../models/verification.model';
 import { tokenService } from './token.service';
 import { emailService } from '../services/email.service';
@@ -21,6 +21,7 @@ export interface LoginResult {
     username: string;
     email: string;
     isVerified: boolean;
+    role: UserRole;
   };
   message: string;
 }
@@ -242,20 +243,22 @@ export class AuthService {
         return { success: false, message: 'Invalid credentials' };
       }
 
-      // Generate an access token for the user
+      // Generate an access token for the user including role
       const accessToken = tokenService.generateAccessToken(
         user._id.toString(),
-        user.username
+        user.username,
+        user.role
       );
       
       // Generate a refresh token for the user and store it in the database
       const refreshToken = await tokenService.generateRefreshToken(
         user._id.toString(),
-        user.username
+        user.username,
+        user.role
       );
 
       // Log the successful user login
-      logger.info(`User logged in: ${user.username}`);
+      logger.info(`User logged in: ${user.username} (${user.role})`);
 
       return {
         success: true,
@@ -265,7 +268,8 @@ export class AuthService {
           id: user._id.toString(),
           username: user.username,
           email: user.email,
-          isVerified: user.isVerified
+          isVerified: user.isVerified,
+          role: user.role
         },
         message: 'Login successful'
       };
@@ -291,10 +295,11 @@ export class AuthService {
         return { success: false, message: 'Invalid refresh token' };
       }
       
-      // Generate a new access token using the decoded user information
+      // Generate a new access token using the decoded user information including role
       const accessToken = tokenService.generateAccessToken(
         decoded.sub,
-        decoded.username
+        decoded.username,
+        decoded.role
       );
       
       return {

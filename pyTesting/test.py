@@ -38,6 +38,9 @@ print("Login Response:", login_response.json())
 # Extract access and refresh tokens from the login response
 access_token = login_response.json().get("accessToken", "")
 refresh_token = login_response.json().get("refreshToken", "")
+user_role = login_response.json().get("user", {}).get("role", "")
+
+print(f"User role: {user_role}")
 
 # 4. Access Protected Route
 print("\n--- Access Protected Route ---")
@@ -48,23 +51,58 @@ if access_token:
 else:
     print("Access token not available. Cannot access the protected route.")
 
-# 5. Refresh Token
+# 5. Access Role-Based Routes
+if access_token:
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # Test admin-only route
+    print("\n--- Testing Admin Route ---")
+    admin_response = requests.get(f"{base_url}/admin/users", headers=headers)
+    print(f"Admin Route Status: {admin_response.status_code}")
+    print(f"Admin Route Response: {admin_response.json()}")
+    
+    # Test supervisor route
+    print("\n--- Testing Supervisor Route ---")
+    supervisor_response = requests.get(f"{base_url}/admin/reports", headers=headers)
+    print(f"Supervisor Route Status: {supervisor_response.status_code}")
+    print(f"Supervisor Route Response: {supervisor_response.json()}")
+    
+    # Test general user route
+    print("\n--- Testing User Route ---")
+    user_response = requests.get(f"{base_url}/admin/dashboard", headers=headers)
+    print(f"User Route Status: {user_response.status_code}")
+    print(f"User Route Response: {user_response.json()}")
+else:
+    print("Access token not available. Cannot test role-based routes.")
+
+# 6. Refresh Token
 print("\n--- Refresh Token ---")
 if refresh_token:
     refresh_data = {"refreshToken": refresh_token}
     refresh_response = requests.post(f"{base_url}/auth/refresh", json=refresh_data)
     print("Refresh Token Response:", refresh_response.json())
+    
+    # Get new access token
+    new_access_token = refresh_response.json().get("accessToken", "")
+    
+    # Verify the new token works with a protected route
+    if new_access_token:
+        print("\n--- Testing New Access Token ---")
+        headers = {"Authorization": f"Bearer {new_access_token}"}
+        test_response = requests.get(f"{base_url}/profile", headers=headers)
+        print(f"New Token Test Status: {test_response.status_code}")
+        print(f"New Token Test Response: {test_response.json()}")
 else:
     print("Refresh token not available. Cannot refresh the token.")
 
-# 6. Forgot Password
+# 7. Forgot Password
 print("\n--- Forgot Password ---")
 forgot_email = input("Enter the email for password reset: ")
 forgot_password_data = {"email": forgot_email}
 forgot_password_response = requests.post(f"{base_url}/auth/forgot-password", json=forgot_password_data)
 print("Forgot Password Response:", forgot_password_response.json())
 
-# 7. Reset Password
+# 8. Reset Password
 print("\n--- Reset Password ---")
 reset_token = input("Enter the reset token (from email): ")
 new_password = input("Enter the new password: ")
