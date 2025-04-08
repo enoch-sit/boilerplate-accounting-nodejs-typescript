@@ -9,6 +9,7 @@ import { initializeEmailTransporter } from './config/email.config';
 import authRoutes from './routes/auth.routes';
 import protectedRoutes from './routes/protected.routes';
 import adminRoutes from './routes/admin.routes';
+import testingRoutes from './routes/testing.routes';
 import { errorHandler, setupErrorHandling } from './utils/error-handler';
 import { logger } from './utils/logger';
 
@@ -59,6 +60,12 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 app.use('/api/admin', adminRoutes); // Add admin routes
+
+// Testing routes (only in development/test environment)
+if (process.env.NODE_ENV !== 'production') {
+  logger.info('Enabling testing routes (DEVELOPMENT MODE ONLY)');
+  app.use('/api/testing', testingRoutes);
+}
 
 // Health check
 app.get('/health', (req, res) => {

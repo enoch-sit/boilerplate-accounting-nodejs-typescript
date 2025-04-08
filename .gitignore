@@ -1,6 +1,6 @@
 combined_files.txt
 # ps1
-*.ps1
+*flatten.ps1
 # Node.js
 node_modules/
 npm-debug.log

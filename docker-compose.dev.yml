@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: auth-service-dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/auth_dev
+      - JWT_SECRET=dev_secret_key_change_in_production
+      - NODE_ENV=development
+      - EMAIL_HOST=mailhog
+      - EMAIL_PORT=1025
+      - EMAIL_USER=
+      - EMAIL_PASS=
+      - EMAIL_FROM=noreply@auth-example.com
+    depends_on:
+      - mongodb
+      - mailhog
+    command: npm run dev
+
+  auth-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: auth-service-test
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/auth_test
+      - JWT_SECRET=test_secret_key
+      - NODE_ENV=test
+      - BYPASS_MAILHOG=true
+      - USE_MANUAL_INPUT=false
+      - DISABLE_EMAIL=true
+    depends_on:
+      - mongodb
+    command: npm test
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
+    restart: unless-stopped
+
+volumes:
+  mongo-data:

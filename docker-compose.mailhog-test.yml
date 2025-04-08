@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  auth-service-mailhog-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: auth-service-mailhog-test
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"  # Different port to avoid conflicts with dev service
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/auth_mailhog_test
+      - JWT_SECRET=mailhog_test_secret_key
+      - NODE_ENV=test
+      - EMAIL_HOST=mailhog
+      - EMAIL_PORT=1025
+      - EMAIL_USER=
+      - EMAIL_PASS=
+      - EMAIL_FROM=test@auth-example.com
+      - BYPASS_MAILHOG=false  # Explicitly use MailHog
+      - TEST_EMAIL_VERIFICATION=true
+    depends_on:
+      - mongodb
+      - mailhog
+    command: npm run test:mailhog  # We'll create this script
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb-mailhog-test
+    ports:
+      - "27018:27017"  # Different port to avoid conflicts
+    volumes:
+      - mongo-mailhog-data:/data/db
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog-test
+    ports:
+      - "1026:1025"  # Different SMTP port to avoid conflicts
+      - "8026:8025"  # Different web UI port to avoid conflicts
+    restart: unless-stopped
+
+volumes:
+  mongo-mailhog-data:

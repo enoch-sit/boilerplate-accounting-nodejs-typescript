@@ -19,6 +19,12 @@ export class EmailService {
     username: string,
     verificationCode: string
   ): Promise<boolean> {
+    // Skip sending email if DISABLE_EMAIL is set to true
+    if (process.env.DISABLE_EMAIL === 'true') {
+      logger.info(`Email sending disabled. Would have sent verification code ${verificationCode} to ${email}`);
+      return true;
+    }
+
     try {
     // Get the email transporter configured in email.config.ts
     const transporter = getEmailTransporter();
@@ -68,6 +74,12 @@ export class EmailService {
     username: string,
     resetToken: string
   ): Promise<boolean> {
+    // Skip sending email if DISABLE_EMAIL is set to true
+    if (process.env.DISABLE_EMAIL === 'true') {
+      logger.info(`Email sending disabled. Would have sent reset token ${resetToken.substring(0, 10)}... to ${email}`);
+      return true;
+    }
+
     try {
     // Get the email transporter configured in email.config.ts
     const transporter = getEmailTransporter();
