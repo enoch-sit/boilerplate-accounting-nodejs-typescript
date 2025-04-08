@@ -1,229 +1,290 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Tests MailHog service availability and functionality.
+    Tests the MailHog SMTP and API service functionality.
 
 .DESCRIPTION
-    This script checks if the MailHog service is running and accessible,
-    and verifies that emails can be sent and retrieved through its API.
+    This script tests the MailHog service by sending a test email via SMTP
+    and then retrieving it via the MailHog API. It verifies the email delivery pipeline.
+
+.PARAMETER SmtpPort
+    The SMTP port that MailHog is listening on. Default is 1025.
+
+.PARAMETER ApiPort
+    The API/Web port that MailHog is listening on. Default is 8025.
+
+.PARAMETER BaseUrl
+    The base URL where MailHog API is available. Default is http://localhost:8025.
+
+.PARAMETER Verbose
+    Run with detailed logging.
 
 .EXAMPLE
-    . .\mailhog-check.ps1
-    $status = Test-MailhogService
-    if ($status.Success) { Write-Host "MailHog is working properly" }
+    .\mailhog-check.ps1
+
+.EXAMPLE
+    .\mailhog-check.ps1 -Verbose
 
 .NOTES
     Author: AuthSystem Team
     Date:   April 2025
 #>
 
-# Function to check if MailHog API is responding
-function Test-MailhogApiAvailable {
+param (
+    [int]$SmtpPort = 1025,
+    [int]$ApiPort = 8025,
+    [string]$BaseUrl = "http://localhost:8025",
+    [switch]$Verbose
+)
+
+# Configure error action and verbose preferences
+if ($Verbose) {
+    $VerbosePreference = "Continue"
+    $ErrorActionPreference = "Continue"
+} else {
+    $VerbosePreference = "SilentlyContinue"
+    $ErrorActionPreference = "Stop"
+}
+
+# Function to check if MailHog API is accessible
+function Test-MailHogApi {
     param (
-        [string]$ApiUrl = "http://localhost:8025"
+        [string]$ApiUrl = "$BaseUrl/api/v2/messages"
     )
     
     try {
-        $response = Invoke-RestMethod -Uri "$ApiUrl/api/v2/messages" -Method Get -TimeoutSec 5
-        return $true
+        Write-Verbose "Testing MailHog API at $ApiUrl"
+        $response = Invoke-RestMethod -Uri $ApiUrl -Method Get -TimeoutSec 5
+        return @{
+            Available = $true
+            Status = "MailHog API is accessible"
+        }
     }
     catch {
-        return $false
+        return @{
+            Available = $false
+            Status = "MailHog API is not accessible: $_"
+        }
     }
 }
 
-# Function to clear all messages from MailHog
-function Clear-MailhogMessages {
-    param (
-        [string]$ApiUrl = "http://localhost:8025"
-    )
-    
-    try {
-        Invoke-RestMethod -Uri "$ApiUrl/api/v1/messages" -Method Delete -TimeoutSec 5 | Out-Null
-        return $true
-    }
-    catch {
-        return $false
-    }
-}
-
-# Function to send a test email through SMTP to MailHog
+# Function to send a test email via SMTP
 function Send-TestEmail {
     param (
         [string]$SmtpServer = "localhost",
-        [int]$SmtpPort = 1025,
-        [string]$FromAddress = "test@example.com",
-        [string]$ToAddress = "recipient@example.com",
-        [string]$Subject = "Test Email from Pipeline",
-        [string]$Body = "This is a test email sent by the testing pipeline."
+        [int]$Port = $SmtpPort,
+        [string]$From = "test@example.com",
+        [string]$To = "recipient@example.com",
+        [string]$Subject = "Test Email $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+        [string]$Body = "This is a test email sent by the MailHog check script at $(Get-Date)"
     )
     
     try {
-        # Create a .NET mail message
-        $mail = New-Object System.Net.Mail.MailMessage
-        $mail.From = New-Object System.Net.Mail.MailAddress($FromAddress)
-        $mail.Subject = $Subject
-        $mail.Body = $Body
-        $mail.IsBodyHtml = $false
-        $mail.To.Add($ToAddress)
+        Write-Verbose "Sending test email via SMTP to $SmtpServer:$Port"
         
-        # Create SMTP client
-        $smtp = New-Object System.Net.Mail.SmtpClient($SmtpServer, $SmtpPort)
-        $smtp.EnableSsl = $false
-        $smtp.Credentials = $null
+        # Generate a unique ID for tracking this email
+        $uniqueId = [Guid]::NewGuid().ToString()
+        $Subject = "$Subject - $uniqueId"
+        
+        # Create SMTP client object
+        $smtpClient = New-Object System.Net.Mail.SmtpClient
+        $smtpClient.Host = $SmtpServer
+        $smtpClient.Port = $Port
+        # No authentication needed for MailHog
+        
+        # Create mail message
+        $mailMessage = New-Object System.Net.Mail.MailMessage
+        $mailMessage.From = New-Object System.Net.Mail.MailAddress($From)
+        $mailMessage.Subject = $Subject
+        $mailMessage.Body = $Body
+        $mailMessage.To.Add($To)
         
         # Send the message
-        $smtp.Send($mail)
+        $smtpClient.Send($mailMessage)
         
-        # Clean up
-        $mail.Dispose()
-        $smtp.Dispose()
-        
-        return $true
+        return @{
+            Success = $true
+            EmailId = $uniqueId
+            Subject = $Subject
+            From = $From
+            To = $To
+            SentAt = Get-Date
+        }
     }
     catch {
-        Write-Verbose "Failed to send test email: $_"
-        return $false
+        return @{
+            Success = $false
+            Error = "Failed to send email: $_"
+        }
     }
 }
 
-# Function to check if a test email was received
+# Function to check if the test email was received by MailHog
 function Test-EmailReceived {
     param (
-        [string]$ApiUrl = "http://localhost:8025",
-        [string]$FromAddress = "test@example.com",
-        [string]$ToAddress = "recipient@example.com",
-        [int]$RetryCount = 5,
-        [int]$RetryDelay = 1 # seconds
+        [Parameter(Mandatory=$true)]
+        [string]$SubjectPattern,
+        [int]$MaxAttempts = 5,
+        [int]$DelaySeconds = 2
     )
     
-    for ($i = 0; $i -lt $RetryCount; $i++) {
+    Write-Verbose "Checking for email with subject matching: $SubjectPattern"
+    
+    # Attempt to find the email multiple times with delay
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
-            $messages = Invoke-RestMethod -Uri "$ApiUrl/api/v2/messages" -Method Get -TimeoutSec 5
+            Write-Verbose "Attempt $attempt of $MaxAttempts"
             
-            # Check if we have messages
-            if ($messages.count -gt 0) {
-                # Look for our test email
-                foreach ($item in $messages.items) {
-                    if (
-                        ($item.Content.Headers.From -match $FromAddress) -and
-                        ($item.Content.Headers.To -match $ToAddress)
-                    ) {
-                        return $true
+            # Get all messages from MailHog API
+            $response = Invoke-RestMethod -Uri "$BaseUrl/api/v2/messages" -Method Get
+            
+            # Look for our test email
+            foreach ($item in $response.items) {
+                $subject = $item.Content.Headers.Subject[0]
+                Write-Verbose "Found email with subject: $subject"
+                
+                if ($subject -match $SubjectPattern) {
+                    # Found our email
+                    return @{
+                        Found = $true
+                        Message = $item
+                        Subject = $subject
+                        Body = $item.Content.Body
+                        ReceivedAt = Get-Date
                     }
                 }
             }
             
-            # Wait before retrying
-            Start-Sleep -Seconds $RetryDelay
+            # If we get here, the email wasn't found in this attempt
+            Write-Verbose "Email not found on attempt $attempt, waiting $DelaySeconds seconds..."
+            Start-Sleep -Seconds $DelaySeconds
         }
         catch {
-            Write-Verbose "Error checking for received email: $_"
-            Start-Sleep -Seconds $RetryDelay
+            Write-Warning "Error checking for email: $_"
+            Start-Sleep -Seconds $DelaySeconds
         }
     }
     
-    return $false
+    # If we get here, we didn't find the email after all attempts
+    return @{
+        Found = $false
+        Error = "Email with subject matching '$SubjectPattern' not found after $MaxAttempts attempts"
+    }
 }
 
-# Main function to test MailHog service
-function Test-MailhogService {
-    param (
-        [string]$ApiUrl = "http://localhost:8025",
-        [string]$SmtpServer = "localhost",
-        [int]$SmtpPort = 1025
-    )
+# Function to clean up MailHog by deleting all messages
+function Clear-MailHogMessages {
+    try {
+        Write-Verbose "Clearing all messages from MailHog"
+        Invoke-RestMethod -Uri "$BaseUrl/api/v1/messages" -Method Delete | Out-Null
+        return $true
+    }
+    catch {
+        Write-Warning "Failed to clear MailHog messages: $_"
+        return $false
+    }
+}
+
+# Main testing function
+function Test-MailHogFunctionality {
+    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "  MAILHOG SERVICE CHECK  " -ForegroundColor Cyan
+    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "Starting check at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
+    Write-Host "MailHog API URL: $BaseUrl" -ForegroundColor Gray
+    Write-Host "MailHog SMTP Port: $SmtpPort" -ForegroundColor Gray
     
-    # Step 1: Check if MailHog API is responding
-    $apiAvailable = Test-MailhogApiAvailable -ApiUrl $ApiUrl
-    if (-not $apiAvailable) {
+    # Step 1: Check if MailHog API is accessible
+    Write-Host "`nChecking MailHog API accessibility..." -ForegroundColor Cyan
+    $apiStatus = Test-MailHogApi
+    
+    if ($apiStatus.Available) {
+        Write-Host "✅ MailHog API is accessible" -ForegroundColor Green
+    } else {
+        Write-Host "❌ MailHog API is NOT accessible: $($apiStatus.Status)" -ForegroundColor Red
         return @{
             Success = $false
-            Message = "MailHog API is not available at $ApiUrl"
-            ApiAvailable = $false
-            CanSendEmail = $false
-            CanReceiveEmail = $false
+            ApiAccessible = $false
+            SmtpFunctional = $false
+            Error = $apiStatus.Status
         }
     }
     
-    # Step 2: Clear existing messages
-    $clearSuccessful = Clear-MailhogMessages -ApiUrl $ApiUrl
-    if (-not $clearSuccessful) {
+    # Step 2: Clear any existing messages
+    Write-Host "`nClearing existing messages..." -ForegroundColor Cyan
+    $clearResult = Clear-MailHogMessages
+    
+    if ($clearResult) {
+        Write-Host "✅ Cleared existing messages" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ Could not clear messages, test may not be reliable" -ForegroundColor Yellow
+    }
+    
+    # Step 3: Send test email
+    Write-Host "`nSending test email..." -ForegroundColor Cyan
+    $sendResult = Send-TestEmail
+    
+    if ($sendResult.Success) {
+        Write-Host "✅ Test email sent successfully" -ForegroundColor Green
+        Write-Host "  Subject: $($sendResult.Subject)" -ForegroundColor Gray
+        Write-Host "  From: $($sendResult.From)" -ForegroundColor Gray
+        Write-Host "  To: $($sendResult.To)" -ForegroundColor Gray
+    } else {
+        Write-Host "❌ Failed to send test email: $($sendResult.Error)" -ForegroundColor Red
         return @{
             Success = $false
-            Message = "Failed to clear MailHog messages"
-            ApiAvailable = $true
-            CanSendEmail = $false
-            CanReceiveEmail = $false
+            ApiAccessible = $true
+            SmtpFunctional = $false
+            Error = $sendResult.Error
         }
     }
     
-    # Step 3: Send a test email
-    $fromAddress = "test-pipeline@example.com"
-    $toAddress = "test-recipient@example.com"
-    $subject = "Test Email from Pipeline - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    # Step 4: Check if email was received
+    Write-Host "`nChecking if test email was received..." -ForegroundColor Cyan
+    $receiveResult = Test-EmailReceived -SubjectPattern $sendResult.EmailId
     
-    $sendSuccessful = Send-TestEmail `
-        -SmtpServer $SmtpServer `
-        -SmtpPort $SmtpPort `
-        -FromAddress $fromAddress `
-        -ToAddress $toAddress `
-        -Subject $subject
-    
-    if (-not $sendSuccessful) {
+    if ($receiveResult.Found) {
+        Write-Host "✅ Test email was received successfully" -ForegroundColor Green
+        Write-Host "  Subject: $($receiveResult.Subject)" -ForegroundColor Gray
+        Write-Host "  Body: $($receiveResult.Body)" -ForegroundColor Gray
+    } else {
+        Write-Host "❌ Test email was NOT received: $($receiveResult.Error)" -ForegroundColor Red
         return @{
             Success = $false
-            Message = "Failed to send test email to MailHog"
-            ApiAvailable = $true
-            CanSendEmail = $false
-            CanReceiveEmail = $false
+            ApiAccessible = $true
+            SmtpFunctional = $false
+            Error = $receiveResult.Error
         }
     }
     
-    # Step 4: Verify the email was received
-    $emailReceived = Test-EmailReceived `
-        -ApiUrl $ApiUrl `
-        -FromAddress $fromAddress `
-        -ToAddress $toAddress `
-        -RetryCount 5 `
-        -RetryDelay 1
+    # Step 5: Test email deletion
+    Write-Host "`nTesting email deletion functionality..." -ForegroundColor Cyan
+    $deleteResult = Clear-MailHogMessages
     
-    if (-not $emailReceived) {
-        return @{
-            Success = $false
-            Message = "Test email was not received by MailHog"
-            ApiAvailable = $true
-            CanSendEmail = $true
-            CanReceiveEmail = $false
-        }
+    if ($deleteResult) {
+        Write-Host "✅ Email deletion functionality works" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️ Email deletion functionality is unreliable" -ForegroundColor Yellow
     }
     
-    # All tests passed
+    # Overall success
+    Write-Host "`n====================================" -ForegroundColor Cyan
+    Write-Host "  MAILHOG TEST SUMMARY  " -ForegroundColor Cyan
+    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "✅ MailHog is fully functional" -ForegroundColor Green
+    Write-Host "✅ API is accessible" -ForegroundColor Green
+    Write-Host "✅ SMTP functionality is working" -ForegroundColor Green
+    Write-Host "`nEmail testing can proceed" -ForegroundColor Green
+    
     return @{
         Success = $true
-        Message = "MailHog service is working properly"
-        ApiAvailable = $true
-        CanSendEmail = $true
-        CanReceiveEmail = $true
+        ApiAccessible = $true
+        SmtpFunctional = $true
     }
 }
 
-# If script is run directly (not sourced), run the test
-if ($MyInvocation.InvocationName -eq $MyInvocation.MyCommand.Name) {
-    $status = Test-MailhogService
-    
-    if ($status.Success) {
-        Write-Host "✅ MailHog is working properly" -ForegroundColor Green
-        Write-Host "  - API Available: Yes" -ForegroundColor Green
-        Write-Host "  - Can Send Emails: Yes" -ForegroundColor Green
-        Write-Host "  - Can Receive Emails: Yes" -ForegroundColor Green
-        Write-Host "  - UI Available at: http://localhost:8025" -ForegroundColor Gray
-    } else {
-        Write-Host "❌ MailHog check failed: $($status.Message)" -ForegroundColor Red
-        Write-Host "  - API Available: $(if ($status.ApiAvailable) {"Yes"} else {"No"})" -ForegroundColor $(if ($status.ApiAvailable) {"Green"} else {"Red"})
-        Write-Host "  - Can Send Emails: $(if ($status.CanSendEmail) {"Yes"} else {"No"})" -ForegroundColor $(if ($status.CanSendEmail) {"Green"} else {"Red"})
-        Write-Host "  - Can Receive Emails: $(if ($status.CanReceiveEmail) {"Yes"} else {"No"})" -ForegroundColor $(if ($status.CanReceiveEmail) {"Green"} else {"Red"})
-    }
-    
-    exit [int](-not $status.Success)
-}
+# Run the main test function
+$result = Test-MailHogFunctionality
+
+# Return the result object
+return $result

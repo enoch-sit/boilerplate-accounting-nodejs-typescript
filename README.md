@@ -559,3 +559,50 @@ The project includes a comprehensive Windows-based development and testing pipel
 ```
 
 For detailed information about the testing pipeline, see [Test Documentation](./tests/Test.md).
+
+## Windows Development and Testing Pipeline
+
+This project includes a comprehensive Windows development and testing pipeline to ensure the authentication system functions correctly across various environments.
+
+### Quick Start for Windows Testing
+
+```powershell
+# Run the complete testing pipeline
+.\tests\test-pipeline.ps1
+
+# Run only unit tests
+.\tests\test-pipeline.ps1 -UnitTestsOnly
+
+# Run only API tests
+.\tests\test-pipeline.ps1 -ApiTestsOnly
+```
+
+The pipeline automatically adapts to your environment:
+
+1. **Complete Environment**: Tests everything including email verification with MailHog
+2. **Minimal Environment**: Falls back to direct verification if MailHog is unavailable
+3. **Local Development**: Can run tests that don't require Docker services
+
+For detailed instructions and troubleshooting, see [Test.md](./tests/Test.md).
+
+### Pipeline Features
+
+- **Unit Testing**: Core functionality validation with Jest
+- **Docker Environment Checks**: Verifies containers are running properly
+- **MailHog Testing**: Validates email testing infrastructure
+- **API Endpoint Testing**: Tests all endpoints with comprehensive coverage
+- **Adaptive Testing**: Continues testing when some services are unavailable
+- **Detailed Reporting**: Generates reports of all test results
+
+### Troubleshooting Common Issues
+
+```powershell
+# Check Docker containers health
+.\tests\docker-health-check.ps1
+
+# Test MailHog functionality
+.\tests\mailhog-check.ps1
+
+# Run API tests with email verification bypass
+.\tests\auto-verify-tests.ps1
+```

@@ -1,322 +1,388 @@
-# PowerShell script for testing authentication endpoints with MailHog email verification
-# This script specifically tests the email verification flow using MailHog
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Tests the email functionality using MailHog API.
 
-# Base URLs for the authentication service and MailHog
-$authBaseUrl = "http://localhost:3001" # Changed port for MailHog test environment
-$mailhogBaseUrl = "http://localhost:8026" # MailHog web API port for test environment
+.DESCRIPTION
+    This script performs comprehensive testing of the email functionality by 
+    triggering application endpoints that send emails and then verifying receipt in MailHog.
 
-# Create a directory to store test results
-$testDir = ".\tests\mailhog-tests"
-if (-not (Test-Path $testDir)) {
-    New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+.PARAMETER ApiBaseUrl
+    The base URL of your application API. Default is http://localhost:3000.
+
+.PARAMETER MailHogUrl
+    The base URL of MailHog API. Default is http://localhost:8025.
+
+.PARAMETER Verbose
+    Run with detailed logging.
+
+.EXAMPLE
+    .\mailhog-email-tests.ps1
+
+.EXAMPLE
+    .\mailhog-email-tests.ps1 -ApiBaseUrl "http://localhost:8080" -Verbose
+
+.NOTES
+    Author: AuthSystem Team
+    Date:   April 2025
+#>
+
+param (
+    [string]$ApiBaseUrl = "http://localhost:3000",
+    [string]$MailHogUrl = "http://localhost:8025",
+    [switch]$Verbose
+)
+
+# Configure error action and verbose preferences
+if ($Verbose) {
+    $VerbosePreference = "Continue"
+    $ErrorActionPreference = "Continue"
+} else {
+    $VerbosePreference = "SilentlyContinue"
+    $ErrorActionPreference = "Stop"
 }
 
-# Function to display test results
-function Show-TestResult {
-    param (
-        [string]$testName,
-        [object]$response
-    )
-    Write-Host "`n======================="
-    Write-Host "TEST: $testName" -ForegroundColor Cyan
-    Write-Host "Status: $($response.StatusCode)" -ForegroundColor $(if ($response.StatusCode -lt 400) { "Green" } else { "Red" })
-    Write-Host "Response:"
-    Write-Host "$($response.Content)" -ForegroundColor $(if ($response.StatusCode -lt 400) { "Green" } else { "Yellow" })
-    Write-Host "======================`n"
-}
-
-# Variables to store tokens and user data
-$accessToken = ""
-$refreshToken = ""
-$userId = ""
-$verificationToken = ""
-
-# -----------------
-# Helper Functions for MailHog Integration
-# -----------------
-
-function Get-MailhogMessages {
+# Function to clear all emails in MailHog
+function Clear-MailHogEmails {
     try {
-        $response = Invoke-RestMethod -Uri "$mailhogBaseUrl/api/v2/messages" -Method Get -ErrorAction Stop
-        return $response
+        Write-Verbose "Clearing all emails in MailHog"
+        Invoke-RestMethod -Uri "$MailHogUrl/api/v1/messages" -Method Delete | Out-Null
+        return $true
     }
     catch {
-        Write-Host "Failed to retrieve messages from MailHog: $($_.Exception.Message)" -ForegroundColor Red
-        return $null
+        Write-Warning "Failed to clear MailHog emails: $_"
+        return $false
     }
 }
 
-function Clear-MailhogMessages {
-    try {
-        $response = Invoke-RestMethod -Uri "$mailhogBaseUrl/api/v1/messages" -Method Delete -ErrorAction Stop
-        Write-Host "MailHog messages cleared successfully" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Failed to clear MailHog messages: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
-
-function Extract-VerificationTokenFromEmail {
+# Function to wait for an email to arrive with specific text in subject or body
+function Wait-ForEmail {
     param (
-        [string]$emailTo
+        [Parameter(Mandatory=$true)]
+        [string]$SearchText,
+        [int]$TimeoutSeconds = 10,
+        [int]$PollIntervalSeconds = 1,
+        [switch]$SearchInBody,
+        [switch]$SearchInSubject
     )
     
-    Write-Host "Waiting for verification email to arrive in MailHog..." -ForegroundColor Yellow
+    Write-Verbose "Waiting for email containing '$SearchText'"
+    $startTime = Get-Date
+    $endTime = $startTime.AddSeconds($TimeoutSeconds)
     
-    # Wait for email to arrive (retry 10 times with 1-second delay)
-    $retryCount = 0
-    $maxRetries = 10
-    $emailFound = $false
-    $verificationUrl = $null
-    
-    while (-not $emailFound -and $retryCount -lt $maxRetries) {
-        Start-Sleep -Seconds 1
-        $messages = Get-MailhogMessages
-        
-        if ($messages -and $messages.items.length -gt 0) {
-            foreach ($message in $messages.items) {
-                # Check if this email is sent to our test user
-                if ($message.to -like "*$emailTo*" -or $message.Content.Headers.To -like "*$emailTo*") {
-                    $emailContent = $message.Content.Body
-                    
-                    # Extract verification URL using regex (pattern may need adjustment based on actual email format)
-                    if ($emailContent -match "(https?://[^\s]+verify-email[^\s]+)") {
-                        $verificationUrl = $matches[1]
-                        $emailFound = $true
-                        break
+    while ((Get-Date) -lt $endTime) {
+        try {
+            $response = Invoke-RestMethod -Uri "$MailHogUrl/api/v2/messages" -Method Get
+            
+            foreach ($item in $response.items) {
+                $subject = $item.Content.Headers.Subject[0]
+                $body = $item.Content.Body
+                
+                $match = $false
+                if ($SearchInSubject -and $subject -match $SearchText) {
+                    $match = $true
+                }
+                if ($SearchInBody -and $body -match $SearchText) {
+                    $match = $true
+                }
+                if (-not $SearchInSubject -and -not $SearchInBody) {
+                    # If neither flag is specified, search in both
+                    if ($subject -match $SearchText -or $body -match $SearchText) {
+                        $match = $true
                     }
-                    
-                    # Alternative regex for token-only format
-                    if ($emailContent -match "verification code: ([a-zA-Z0-9-]+)") {
-                        $verificationToken = $matches[1]
-                        $emailFound = $true
-                        break
+                }
+                
+                if ($match) {
+                    return @{
+                        Found = $true
+                        Message = $item
+                        Subject = $subject
+                        Body = $body
+                        Id = $item.ID
                     }
                 }
             }
-        }
-        
-        $retryCount++
-    }
-    
-    if ($emailFound) {
-        Write-Host "Verification email found!" -ForegroundColor Green
-        
-        # Extract token from URL if we have a URL
-        if ($verificationUrl) {
-            if ($verificationUrl -match "token=([^&]+)") {
-                $verificationToken = $matches[1]
-            }
-        }
-        
-        return $verificationToken
-    }
-    else {
-        Write-Host "Verification email not found after $maxRetries attempts" -ForegroundColor Red
-        return $null
-    }
-}
-
-# -----------------
-# Email Verification Test Flow
-# -----------------
-
-Write-Host "Starting MailHog Email Verification Test..." -ForegroundColor Magenta
-
-# Clear any existing messages in MailHog before starting
-Clear-MailhogMessages
-
-# 1. Signup Test
-$randomSuffix = Get-Random
-$testUsername = "testuser$randomSuffix"
-$testEmail = "testuser$randomSuffix@example.com"
-$testPassword = "TestPassword123!"
-
-$signupBody = @{
-    username = $testUsername
-    email = $testEmail
-    password = $testPassword
-} | ConvertTo-Json
-
-Write-Host "Signing up user: $testUsername"
-try {
-    $response = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/signup" -Method Post -ContentType "application/json" -Body $signupBody -ErrorAction Stop
-    Write-Host "Signup successful!" -ForegroundColor Green
-    Write-Host "User ID: $($response.userId)"
-    $userId = $response.userId
-    
-    # Save response to a file for reference
-    $response | ConvertTo-Json | Out-File "$testDir\signup_response.json"
-}
-catch {
-    Write-Host "Signup failed with error:" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    exit 1
-}
-
-# 2. Extract verification token from MailHog
-if ($userId) {
-    Write-Host "`nChecking MailHog for verification email..." -ForegroundColor Cyan
-    
-    $verificationToken = Extract-VerificationTokenFromEmail -emailTo $testEmail
-    
-    if ($verificationToken) {
-        Write-Host "Successfully extracted verification token: $verificationToken" -ForegroundColor Green
-        
-        # Save MailHog data for debugging
-        $mailhogData = Get-MailhogMessages
-        $mailhogData | ConvertTo-Json -Depth 10 | Out-File "$testDir\mailhog_messages.json"
-        
-        # 3. Verify email with the token
-        Write-Host "`nVerifying email with token from MailHog..."
-        
-        $verifyBody = @{
-            token = $verificationToken
-        } | ConvertTo-Json
-        
-        try {
-            $verifyResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/verify-email" -Method Post -ContentType "application/json" -Body $verifyBody -ErrorAction Stop
-            Write-Host "Email verification successful!" -ForegroundColor Green
-            Write-Host "Message: $($verifyResponse.message)" -ForegroundColor Green
             
-            # Save response for reference
-            $verifyResponse | ConvertTo-Json | Out-File "$testDir\verify_email_response.json"
+            # If we get here, no matching email was found yet
+            Start-Sleep -Seconds $PollIntervalSeconds
         }
         catch {
-            Write-Host "Email verification failed with error:" -ForegroundColor Red
-            Write-Host $_.Exception.Message
-            exit 1
+            Write-Warning "Error checking for email: $_"
+            Start-Sleep -Seconds $PollIntervalSeconds
         }
     }
-    else {
-        Write-Host "Failed to extract verification token from MailHog" -ForegroundColor Red
-        exit 1
+    
+    # If we get here, we timed out waiting for the email
+    return @{
+        Found = $false
+        Error = "Email containing '$SearchText' not found after $TimeoutSeconds seconds"
     }
 }
 
-# 4. Login with verified account
-Write-Host "`nAttempting to login with verified account..."
-$loginBody = @{
-    username = $testUsername
-    password = $testPassword
-} | ConvertTo-Json
-
-try {
-    $loginResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/login" -Method Post -ContentType "application/json" -Body $loginBody -ErrorAction Stop
-    Write-Host "Login successful!" -ForegroundColor Green
+# Function to register a new user
+function Register-NewUser {
+    param (
+        [string]$Email = "test_$(Get-Random)@example.com",
+        [string]$Password = "Test1234!",
+        [string]$Username = "testuser_$(Get-Random)"
+    )
     
-    # Save tokens
-    $accessToken = $loginResponse.accessToken
-    $refreshToken = $loginResponse.refreshToken
-    
-    # Save response for reference
-    $loginResponse | ConvertTo-Json | Out-File "$testDir\login_response.json"
-    
-    if ($accessToken) {
-        Write-Host "Access token received successfully!" -ForegroundColor Green
-    }
-    if ($refreshToken) {
-        Write-Host "Refresh token received successfully!" -ForegroundColor Green
-    }
-}
-catch {
-    Write-Host "Login failed with error:" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    exit 1
-}
-
-# 5. Access protected route with token
-if ($accessToken) {
-    Write-Host "`nTesting protected routes with authenticated user..." -ForegroundColor Cyan
-    $headers = @{
-        "Authorization" = "Bearer $accessToken"
-    }
-    
-    try {
-        $dashboardResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/protected/dashboard" -Method Get -Headers $headers -ErrorAction Stop
-        Write-Host "Protected dashboard access: SUCCESS" -ForegroundColor Green
-        Write-Host "Message: $($dashboardResponse.message)" -ForegroundColor Green
-        
-        # Save response for reference
-        $dashboardResponse | ConvertTo-Json | Out-File "$testDir\dashboard_response.json"
-    }
-    catch {
-        Write-Host "Protected dashboard access: FAILED" -ForegroundColor Red
-        Write-Host $_.Exception.Message
-        exit 1
-    }
-}
-
-# 6. Test password reset flow with MailHog
-Write-Host "`nTesting password reset flow with MailHog..." -ForegroundColor Cyan
-
-# Clear previous emails
-Clear-MailhogMessages
-
-# Request password reset
-$forgotPasswordBody = @{
-    email = $testEmail
-} | ConvertTo-Json
-
-try {
-    $forgotResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/forgot-password" -Method Post -ContentType "application/json" -Body $forgotPasswordBody -ErrorAction Stop
-    Write-Host "Password reset request successful!" -ForegroundColor Green
-    
-    # Save response for reference
-    $forgotResponse | ConvertTo-Json | Out-File "$testDir\forgot_password_response.json"
-}
-catch {
-    Write-Host "Password reset request failed with error:" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    exit 1
-}
-
-# Extract reset token from MailHog
-$resetToken = Extract-VerificationTokenFromEmail -emailTo $testEmail
-
-if ($resetToken) {
-    Write-Host "Successfully extracted password reset token: $resetToken" -ForegroundColor Green
-    
-    # Reset password with token
-    $newPassword = "NewPassword456!"
-    $resetPasswordBody = @{
-        token = $resetToken
-        newPassword = $newPassword
+    $body = @{
+        email = $Email
+        password = $Password
+        username = $Username
     } | ConvertTo-Json
     
+    Write-Verbose "Registering new user: $Username <$Email>"
+    
     try {
-        $resetResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/reset-password" -Method Post -ContentType "application/json" -Body $resetPasswordBody -ErrorAction Stop
-        Write-Host "Password reset successful!" -ForegroundColor Green
-        
-        # Save response for reference
-        $resetResponse | ConvertTo-Json | Out-File "$testDir\reset_password_response.json"
-        
-        # Verify login with new password
-        $loginNewPassBody = @{
-            username = $testUsername
-            password = $newPassword
-        } | ConvertTo-Json
-        
-        try {
-            $loginNewResponse = Invoke-RestMethod -Uri "$authBaseUrl/api/auth/login" -Method Post -ContentType "application/json" -Body $loginNewPassBody -ErrorAction Stop
-            Write-Host "Login with new password successful!" -ForegroundColor Green
-            
-            # Save response for reference
-            $loginNewResponse | ConvertTo-Json | Out-File "$testDir\login_new_password_response.json"
-        }
-        catch {
-            Write-Host "Login with new password failed with error:" -ForegroundColor Red
-            Write-Host $_.Exception.Message
+        $response = Invoke-RestMethod -Uri "$ApiBaseUrl/auth/signup" -Method Post -Body $body -ContentType "application/json"
+        return @{
+            Success = $true
+            Email = $Email
+            Password = $Password
+            Username = $Username
+            Response = $response
         }
     }
     catch {
-        Write-Host "Password reset failed with error:" -ForegroundColor Red
-        Write-Host $_.Exception.Message
+        return @{
+            Success = $false
+            Error = "Failed to register user: $_"
+        }
     }
 }
-else {
-    Write-Host "Failed to extract password reset token from MailHog" -ForegroundColor Red
+
+# Function to request password reset
+function Request-PasswordReset {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Email
+    )
+    
+    $body = @{
+        email = $Email
+    } | ConvertTo-Json
+    
+    Write-Verbose "Requesting password reset for: $Email"
+    
+    try {
+        $response = Invoke-RestMethod -Uri "$ApiBaseUrl/auth/forgot-password" -Method Post -Body $body -ContentType "application/json"
+        return @{
+            Success = $true
+            Email = $Email
+            Response = $response
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Error = "Failed to request password reset: $_"
+        }
+    }
 }
 
-Write-Host "`nMailHog Email Verification Test Completed!" -ForegroundColor Magenta
-Write-Host "Results saved to: $testDir"
+# Function to get verification token from email body
+function Get-VerificationTokenFromEmail {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$EmailBody,
+        [string]$Pattern = "token=([a-zA-Z0-9\-_]+)"
+    )
+    
+    if ($EmailBody -match $Pattern) {
+        return $matches[1]
+    }
+    
+    return $null
+}
+
+# Function to verify email 
+function Verify-Email {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Token
+    )
+    
+    Write-Verbose "Verifying email with token: $Token"
+    
+    try {
+        $response = Invoke-RestMethod -Uri "$ApiBaseUrl/auth/verify-email?token=$Token" -Method Get
+        return @{
+            Success = $true
+            Response = $response
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Error = "Failed to verify email: $_"
+        }
+    }
+}
+
+# Function to reset password
+function Reset-Password {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Token,
+        [string]$NewPassword = "NewPassword1234!"
+    )
+    
+    $body = @{
+        token = $Token
+        password = $NewPassword
+    } | ConvertTo-Json
+    
+    Write-Verbose "Resetting password with token: $Token"
+    
+    try {
+        $response = Invoke-RestMethod -Uri "$ApiBaseUrl/auth/reset-password" -Method Post -Body $body -ContentType "application/json"
+        return @{
+            Success = $true
+            NewPassword = $NewPassword
+            Response = $response
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Error = "Failed to reset password: $_"
+        }
+    }
+}
+
+# Main test function
+function Test-EmailFunctionality {
+    $errors = 0
+    $totalTests = 0
+    
+    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "  EMAIL FUNCTIONALITY TESTS  " -ForegroundColor Cyan
+    Write-Host "====================================" -ForegroundColor Cyan
+    Write-Host "Starting tests at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
+    Write-Host "API URL: $ApiBaseUrl" -ForegroundColor Gray
+    Write-Host "MailHog URL: $MailHogUrl" -ForegroundColor Gray
+    
+    # Clear all emails before starting tests
+    Write-Host "`nClearing all existing emails..." -ForegroundColor Cyan
+    Clear-MailHogEmails | Out-Null
+    
+    # Test 1: Registration Email Verification
+    $totalTests++
+    Write-Host "`n[$totalTests] Testing registration email verification..." -ForegroundColor Cyan
+    
+    # Register a new user
+    $registerResult = Register-NewUser
+    
+    if (-not $registerResult.Success) {
+        Write-Host "❌ Failed to register new user: $($registerResult.Error)" -ForegroundColor Red
+        $errors++
+    } else {
+        Write-Host "✅ User registered successfully" -ForegroundColor Green
+        
+        # Wait for verification email
+        $verificationEmail = Wait-ForEmail -SearchText $registerResult.Email -TimeoutSeconds 15 -SearchInBody
+        
+        if (-not $verificationEmail.Found) {
+            Write-Host "❌ Verification email not received: $($verificationEmail.Error)" -ForegroundColor Red
+            $errors++
+        } else {
+            Write-Host "✅ Verification email received" -ForegroundColor Green
+            
+            # Extract verification token
+            $token = Get-VerificationTokenFromEmail -EmailBody $verificationEmail.Body
+            
+            if (-not $token) {
+                Write-Host "❌ Could not extract verification token from email" -ForegroundColor Red
+                $errors++
+            } else {
+                Write-Host "✅ Verification token extracted: $token" -ForegroundColor Green
+                
+                # Verify email
+                $verifyResult = Verify-Email -Token $token
+                
+                if (-not $verifyResult.Success) {
+                    Write-Host "❌ Failed to verify email: $($verifyResult.Error)" -ForegroundColor Red
+                    $errors++
+                } else {
+                    Write-Host "✅ Email verified successfully" -ForegroundColor Green
+                }
+            }
+        }
+    }
+    
+    # Test 2: Password Reset Flow
+    $totalTests++
+    Write-Host "`n[$totalTests] Testing password reset flow..." -ForegroundColor Cyan
+    
+    # Clear emails from previous test
+    Clear-MailHogEmails | Out-Null
+    
+    # Request password reset
+    $resetRequestResult = Request-PasswordReset -Email $registerResult.Email
+    
+    if (-not $resetRequestResult.Success) {
+        Write-Host "❌ Failed to request password reset: $($resetRequestResult.Error)" -ForegroundColor Red
+        $errors++
+    } else {
+        Write-Host "✅ Password reset requested successfully" -ForegroundColor Green
+        
+        # Wait for password reset email
+        $resetEmail = Wait-ForEmail -SearchText "reset" -TimeoutSeconds 15 -SearchInSubject
+        
+        if (-not $resetEmail.Found) {
+            Write-Host "❌ Password reset email not received: $($resetEmail.Error)" -ForegroundColor Red
+            $errors++
+        } else {
+            Write-Host "✅ Password reset email received" -ForegroundColor Green
+            
+            # Extract reset token
+            $resetToken = Get-VerificationTokenFromEmail -EmailBody $resetEmail.Body
+            
+            if (-not $resetToken) {
+                Write-Host "❌ Could not extract reset token from email" -ForegroundColor Red
+                $errors++
+            } else {
+                Write-Host "✅ Reset token extracted: $resetToken" -ForegroundColor Green
+                
+                # Reset password
+                $passwordResetResult = Reset-Password -Token $resetToken
+                
+                if (-not $passwordResetResult.Success) {
+                    Write-Host "❌ Failed to reset password: $($passwordResetResult.Error)" -ForegroundColor Red
+                    $errors++
+                } else {
+                    Write-Host "✅ Password reset successfully" -ForegroundColor Green
+                }
+            }
+        }
+    }
+    
+    # Print test summary
+    Write-Host "`n====================================" -ForegroundColor Cyan
+    Write-Host "  EMAIL TESTS SUMMARY  " -ForegroundColor Cyan
+    Write-Host "====================================" -ForegroundColor Cyan
+    
+    if ($errors -eq 0) {
+        Write-Host "✅ All $totalTests email tests passed successfully!" -ForegroundColor Green
+    } else {
+        Write-Host "❌ $errors out of $totalTests email tests failed!" -ForegroundColor Red
+    }
+    
+    return @{
+        TotalTests = $totalTests
+        Errors = $errors
+        Success = ($errors -eq 0)
+    }
+}
+
+# Run the main test function
+$result = Test-EmailFunctionality
+
+# Return success/failure code
+if ($result.Success) {
+    exit 0
+} else {
+    exit 1
+}

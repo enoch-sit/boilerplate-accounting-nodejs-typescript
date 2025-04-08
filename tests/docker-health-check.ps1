@@ -1,236 +1,266 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Checks the health of Docker containers required for the testing environment.
+    Verifies Docker containers are running properly for development and testing.
 
 .DESCRIPTION
-    This script verifies that Docker Desktop is running and all required containers
-    for the authentication system testing are up and healthy.
+    This script checks if all required Docker containers for the authentication system
+    are running correctly. It verifies the auth service, MongoDB, and MailHog containers.
+
+.PARAMETER ContainerPrefix
+    Optional prefix for container names to filter specific containers.
+
+.PARAMETER Verbose
+    Run with detailed logging.
 
 .EXAMPLE
-    . .\docker-health-check.ps1
-    $status = Test-DockerEnvironment
-    if ($status.Success) { Write-Host "Docker environment is healthy" }
+    .\docker-health-check.ps1
+
+.EXAMPLE
+    .\docker-health-check.ps1 -ContainerPrefix "auth-"
 
 .NOTES
     Author: AuthSystem Team
     Date:   April 2025
 #>
 
-# Function to check if Docker Desktop is running
-function Test-DockerDesktopRunning {
-    try {
-        $dockerProcess = Get-Process 'com.docker.backend' -ErrorAction SilentlyContinue
-        if ($null -eq $dockerProcess) {
-            return $false
-        }
-        
-        # Also verify docker CLI is responding
-        $dockerInfoOutput = docker info 2>&1
-        return ($LASTEXITCODE -eq 0)
-    }
-    catch {
-        return $false
-    }
+param (
+    [string]$ContainerPrefix = "",
+    [switch]$Verbose
+)
+
+# Configure error handling and verbose output
+if ($Verbose) {
+    $VerbosePreference = "Continue"
+    $ErrorActionPreference = "Continue"
+} else {
+    $VerbosePreference = "SilentlyContinue"
+    $ErrorActionPreference = "Stop"
 }
 
-# Function to check if a container is running by container name
-function Test-ContainerRunning {
+# Required containers for the system to function properly
+$requiredContainers = @(
+    @{
+        Type = "app"
+        NamePatterns = @("auth-service", "auth-service-dev", "auth-service-mailhog-test")
+        Required = $true
+        HealthEndpoint = "http://localhost:3000/api/health"
+    },
+    @{
+        Type = "database"
+        NamePatterns = @("mongodb", "mongodb-mailhog-test")
+        Required = $true
+        Port = 27017
+    },
+    @{
+        Type = "mail"
+        NamePatterns = @("mailhog", "mailhog-test")
+        Required = $false # Not strictly required if using direct verification
+        HealthEndpoint = "http://localhost:8025/api/v2/messages"
+    }
+)
+
+function Test-TcpConnection {
     param (
-        [string]$ContainerName
+        [string]$ComputerName,
+        [int]$Port,
+        [int]$Timeout = 1000
     )
     
     try {
-        $containerInfo = docker ps --filter "name=$ContainerName" --format "{{.Names}}" 2>&1
-        return ($containerInfo -eq $ContainerName)
-    }
-    catch {
-        return $false
-    }
-}
-
-# Function to check if a container's health status is healthy
-function Test-ContainerHealth {
-    param (
-        [string]$ContainerName
-    )
-    
-    try {
-        $healthStatus = docker inspect --format "{{.State.Health.Status}}" $ContainerName 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            # Container doesn't have health check defined
-            return $true
-        }
-        
-        return ($healthStatus -eq "healthy")
-    }
-    catch {
-        # If we can't get health, assume it's ok if it's running
-        return $true
-    }
-}
-
-# Function to start a container if it's not running
-function Start-Container {
-    param (
-        [string]$ContainerName,
-        [string]$ComposeFile
-    )
-    
-    try {
-        if (-not (Test-ContainerRunning -ContainerName $ContainerName)) {
-            Write-Host "Starting container $ContainerName..." -ForegroundColor Yellow
-            
-            if ($ComposeFile) {
-                # Start using docker-compose
-                docker-compose -f $ComposeFile up -d $ContainerName 2>&1 | Out-Null
-            } else {
-                # Start using docker
-                docker start $ContainerName 2>&1 | Out-Null
-            }
-            
-            # Wait a moment for container to initialize
-            Start-Sleep -Seconds 3
-            
-            return (Test-ContainerRunning -ContainerName $ContainerName)
-        }
-        
-        return $true
-    }
-    catch {
-        return $false
-    }
-}
-
-# Function to check if a port is open on localhost
-function Test-PortOpen {
-    param (
-        [int]$Port
-    )
-    
-    try {
-        $tcp = New-Object System.Net.Sockets.TcpClient
-        $connection = $tcp.BeginConnect('localhost', $Port, $null, $null)
-        $wait = $connection.AsyncWaitHandle.WaitOne(1000, $false)
+        Write-Verbose "Testing TCP connection to $ComputerName on port $Port..."
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $connection = $tcpClient.BeginConnect($ComputerName, $Port, $null, $null)
+        $wait = $connection.AsyncWaitHandle.WaitOne($Timeout, $false)
         
         if ($wait) {
-            $tcp.EndConnect($connection)
-            $tcp.Close()
+            $tcpClient.EndConnect($connection)
+            $tcpClient.Close()
             return $true
         } else {
-            $tcp.Close()
+            $tcpClient.Close()
             return $false
         }
     }
     catch {
+        Write-Verbose "TCP connection error: $_"
         return $false
     }
 }
 
-# Main function to test Docker environment health
-function Test-DockerEnvironment {
-    # Define the required containers and their ports
-    $requiredContainers = @(
-        @{
-            Name = "mongodb"
-            Port = 27017
-            ComposeFile = "docker-compose.dev.yml"
-        },
-        @{
-            Name = "mailhog"
-            Port = 8025
-            ComposeFile = "docker-compose.dev.yml"
-        },
-        @{
-            Name = "auth-service"
-            Port = 3000
-            ComposeFile = "docker-compose.dev.yml"
-        }
+function Test-HttpEndpoint {
+    param (
+        [string]$Url,
+        [int]$Timeout = 5
     )
     
-    # First check if Docker Desktop is running
-    if (-not (Test-DockerDesktopRunning)) {
+    try {
+        Write-Verbose "Testing HTTP endpoint: $Url"
+        $response = Invoke-WebRequest -Uri $Url -TimeoutSec $Timeout -UseBasicParsing
+        return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400)
+    }
+    catch {
+        Write-Verbose "HTTP endpoint error: $_"
+        return $false
+    }
+}
+
+function Get-ContainerList {
+    param(
+        [string]$Prefix = ""
+    )
+    
+    try {
+        Write-Verbose "Getting Docker container list..."
+        
+        if ($Prefix) {
+            $filter = "--filter name=$Prefix"
+        } else {
+            $filter = ""
+        }
+        
+        $containers = @(docker ps -a --format "{{.ID}}|{{.Names}}|{{.Status}}|{{.Ports}}" $filter)
+        
+        $containerList = @()
+        foreach ($container in $containers) {
+            $parts = $container -split "\|"
+            
+            if ($parts.Count -ge 3) {
+                $containerInfo = @{
+                    Id = $parts[0]
+                    Name = $parts[1]
+                    Status = $parts[2]
+                    Ports = if ($parts.Count -gt 3) { $parts[3] } else { "" }
+                    Running = $parts[2] -match "^Up "
+                }
+                
+                $containerList += $containerInfo
+            }
+        }
+        
+        return $containerList
+    }
+    catch {
+        Write-Error "Failed to get Docker container list: $_"
+        return @()
+    }
+}
+
+function Find-RequiredContainer {
+    param(
+        [array]$Containers,
+        [string[]]$NamePatterns
+    )
+    
+    foreach ($pattern in $NamePatterns) {
+        foreach ($container in $Containers) {
+            if ($container.Name -match $pattern) {
+                return $container
+            }
+        }
+    }
+    
+    return $null
+}
+
+function Test-DockerEnvironment {
+    Write-Host "Checking Docker environment..." -ForegroundColor Cyan
+    
+    # Check if Docker is installed and running
+    try {
+        $dockerVersion = docker version --format '{{.Server.Version}}'
+        Write-Host "Docker version: $dockerVersion" -ForegroundColor Green
+    }
+    catch {
         return @{
             Success = $false
-            Message = "Docker Desktop is not running"
+            Message = "Docker is not running or not installed. Error: $_"
             Containers = @()
         }
     }
     
-    # Check each required container
-    $containerStatuses = @()
-    $overallSuccess = $true
+    # Get all containers
+    $allContainers = Get-ContainerList -Prefix $ContainerPrefix
+    Write-Verbose "Found $($allContainers.Count) containers"
     
-    foreach ($container in $requiredContainers) {
-        $isRunning = Test-ContainerRunning -ContainerName $container.Name
+    # Check each required container type
+    $containerStatus = @()
+    $allRequired = $true
+    
+    foreach ($requiredType in $requiredContainers) {
+        $container = Find-RequiredContainer -Containers $allContainers -NamePatterns $requiredType.NamePatterns
         
-        # Try to start container if it's not running
-        if (-not $isRunning) {
-            $isRunning = Start-Container -ContainerName $container.Name -ComposeFile $container.ComposeFile
+        $status = @{
+            Type = $requiredType.Type
+            NamePatterns = $requiredType.NamePatterns
+            Found = $null -ne $container
+            Running = $false
+            Healthy = $false
+            Name = if ($container) { $container.Name } else { "Not found" }
+            Required = $requiredType.Required
         }
         
-        # Check health only if container is running
-        $isHealthy = $isRunning -and (Test-ContainerHealth -ContainerName $container.Name)
-        
-        # Check port only if container is running and healthy
-        $portOpen = $isRunning -and $isHealthy -and (Test-PortOpen -Port $container.Port)
-        
-        $containerStatuses += @{
-            Name = $container.Name
-            Running = $isRunning
-            Healthy = $isHealthy
-            PortOpen = $portOpen
+        if ($container) {
+            $status.Running = $container.Running
+            
+            # Check container health
+            if ($container.Running) {
+                if ($requiredType.HealthEndpoint) {
+                    $status.Healthy = Test-HttpEndpoint -Url $requiredType.HealthEndpoint
+                } elseif ($requiredType.Port) {
+                    $status.Healthy = Test-TcpConnection -ComputerName "localhost" -Port $requiredType.Port
+                } else {
+                    $status.Healthy = $true # Assume healthy if no health check specified
+                }
+            }
+            
+            # Log specific issues
+            if (-not $status.Running) {
+                Write-Host "Container $($container.Name) is not running" -ForegroundColor Yellow
+            } elseif (-not $status.Healthy) {
+                Write-Host "Container $($container.Name) is running but appears unhealthy" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "Required container of type $($requiredType.Type) not found (patterns: $($requiredType.NamePatterns -join ', '))" -ForegroundColor Yellow
         }
         
-        # Update overall success
-        if (-not ($isRunning -and $isHealthy -and $portOpen)) {
-            $overallSuccess = $false
+        $containerStatus += $status
+        
+        # Track if required containers are missing
+        if ($requiredType.Required -and (-not $status.Found -or -not $status.Running -or -not $status.Healthy)) {
+            $allRequired = $false
         }
     }
     
-    # Return the result
-    return @{
-        Success = $overallSuccess
-        Containers = $containerStatuses
-        Message = if (-not $overallSuccess) { "Not all required containers are running and healthy" } else { "Docker environment is healthy" }
+    # Build result object
+    $result = @{
+        Success = $allRequired
+        Message = if ($allRequired) { "All required Docker containers are running and healthy" } else { "Some required Docker containers are missing or unhealthy" }
+        Containers = $containerStatus
+        AllContainers = $allContainers
     }
+    
+    return $result
 }
 
-# If script is run directly (not sourced), run the test
-if ($MyInvocation.InvocationName -eq $MyInvocation.MyCommand.Name) {
-    $status = Test-DockerEnvironment
+# If script is being run directly (not sourced), output results
+if ($MyInvocation.InvocationName -ne ".") {
+    $result = Test-DockerEnvironment
     
-    if ($status.Success) {
-        Write-Host "✅ Docker environment is healthy" -ForegroundColor Green
-        
-        # Show container statuses
-        foreach ($container in $status.Containers) {
-            Write-Host "  - $($container.Name): " -NoNewline
-            if ($container.Running -and $container.Healthy) {
-                Write-Host "Running & Healthy" -ForegroundColor Green
-            } elseif ($container.Running) {
-                Write-Host "Running (Health unknown)" -ForegroundColor Yellow
-            } else {
-                Write-Host "Not Running" -ForegroundColor Red
-            }
-        }
+    if ($result.Success) {
+        Write-Host "`n✅ Docker environment check passed" -ForegroundColor Green
     } else {
-        Write-Host "❌ Docker environment has issues: $($status.Message)" -ForegroundColor Red
-        
-        # Show container statuses with more detail
-        foreach ($container in $status.Containers) {
-            Write-Host "  - $($container.Name): " -NoNewline
-            if (-not $container.Running) {
-                Write-Host "Not Running" -ForegroundColor Red
-            } elseif (-not $container.Healthy) {
-                Write-Host "Running but Unhealthy" -ForegroundColor Yellow
-            } elseif (-not $container.PortOpen) {
-                Write-Host "Running but Port Not Accessible" -ForegroundColor Yellow
-            } else {
-                Write-Host "Running & Healthy" -ForegroundColor Green
-            }
-        }
+        Write-Host "`n❌ Docker environment check failed: $($result.Message)" -ForegroundColor Red
     }
     
-    exit [int](-not $status.Success)
+    Write-Host "`nContainer Status:" -ForegroundColor Cyan
+    foreach ($container in $result.Containers) {
+        $statusColor = if ($container.Healthy) { "Green" } elseif (-not $container.Required) { "Yellow" } else { "Red" }
+        $statusSymbol = if ($container.Healthy) { "✅" } elseif (-not $container.Required) { "⚠️" } else { "❌" }
+        
+        Write-Host "$statusSymbol $($container.Type): $($container.Name) - " -NoNewline
+        Write-Host $(if ($container.Healthy) { "Healthy" } elseif ($container.Running) { "Unhealthy" } else { "Not Running" }) -ForegroundColor $statusColor
+    }
+    
+    return $result
 }
