@@ -117,13 +117,13 @@ The pipeline automatically adapts to your environment:
          ▼
 ┌─────────────────┐     No     ┌─────────────────┐
 │ Docker Running? ├────────────► Unit Tests Only │
-└────────┬────────┘             └─────────────────┘
+└────────┬────────┘            └─────────────────┘
          │ Yes
          ▼
-┌─────────────────┐     No     ┌─────────────────────────┐
-│MailHog Available├────────────► API Tests with Direct   │
-└────────┬────────┘             │ Verification Bypass    │
-         │ Yes                  └─────────────────────────┘
+┌─────────────────┐     No     ┌────────────────────────┐
+│MailHog Available├────────────► API Tests with Direct  │
+└────────┬────────┘            │ Verification Bypass    │
+         │ Yes                 └────────────────────────┘
          ▼
 ┌─────────────────┐
 │ Run Unit Tests  │
