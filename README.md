@@ -14,17 +14,50 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 
 ## API Endpoints
 
-| Endpoint                 | Method | Description                  |
-| ------------------------ | ------ | ---------------------------- |
-| `/api/auth/signup`       | POST   | Register a new user          |
-| `/api/auth/login`        | POST   | Login with credentials       |
-| `/api/auth/refresh`      | POST   | Refresh access token         |
-| `/api/auth/verify-email` | POST   | Verify email with token      |
-| `/api/profile`           | GET    | Get user profile (Protected) |
-| `/api/reset-password`    | POST   | Reset password with token    |
-| `/api/admin/users`       | GET    | Get all users (Admin only)   |
-| `/api/admin/reports`     | GET    | Access reports (Admin/Supervisor) |
-| `/api/admin/dashboard`   | GET    | Access dashboard (All authenticated users) |
+### Auth Routes (`/api/auth`)
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/api/auth/signup`             | POST   | Register a new user                   | Public            |
+| `/api/auth/verify-email`       | POST   | Verify email with token               | Public            |
+| `/api/auth/resend-verification`| POST   | Resend verification code              | Public            |
+| `/api/auth/login`              | POST   | Login with credentials                | Public            |
+| `/api/auth/refresh`            | POST   | Refresh access token                  | Public            |
+| `/api/auth/logout`             | POST   | Logout (invalidate token)             | Public            |
+| `/api/auth/logout-all`         | POST   | Logout from all devices               | Authenticated     |
+| `/api/auth/forgot-password`    | POST   | Request password reset                | Public            |
+| `/api/auth/reset-password`     | POST   | Reset password with token             | Public            |
+
+### Protected Routes (`/api/protected`)
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/api/protected/profile`       | GET    | Get user profile                      | Authenticated     |
+| `/api/protected/profile`       | PUT    | Update user profile                   | Authenticated     |
+| `/api/protected/change-password`| POST   | Change password                       | Authenticated     |
+| `/api/protected/dashboard`     | GET    | Access protected dashboard content    | Authenticated     |
+
+### Admin Routes (`/api/admin`)
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/api/admin/users`             | GET    | Get all users                         | Admin             |
+| `/api/admin/users/:userId/role`| PUT    | Update user role                      | Admin             |
+| `/api/admin/reports`           | GET    | Access reports                        | Admin/Supervisor  |
+| `/api/admin/dashboard`         | GET    | Access dashboard                      | Any Authenticated |
+
+### Testing Routes (`/api/testing`) - Development Only
+
+| Endpoint                                | Method | Description                           | Access Level      |
+|-----------------------------------------|--------|---------------------------------------|-------------------|
+| `/api/testing/verification-token/:userId/:type?` | GET  | Get verification token for a user     | Development       |
+| `/api/testing/verify-user/:userId`      | POST   | Directly verify a user without token  | Development       |
+
+### Miscellaneous Endpoints
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/health`                      | GET    | Health check endpoint                 | Public            |
 
 ## Testing
 
@@ -606,3 +639,4 @@ For detailed instructions and troubleshooting, see [Test.md](./tests/Test.md).
 # Run API tests with email verification bypass
 .\tests\auto-verify-tests.ps1
 ```
+````

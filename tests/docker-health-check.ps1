@@ -13,11 +13,17 @@
 .PARAMETER Verbose
     Run with detailed logging.
 
+.PARAMETER LogFile
+    Optional path to the log file. Default is "docker-health-check.log" in the script directory.
+
 .EXAMPLE
     .\docker-health-check.ps1
 
 .EXAMPLE
     .\docker-health-check.ps1 -ContainerPrefix "auth-"
+
+.EXAMPLE
+    .\docker-health-check.ps1 -LogFile "C:\logs\docker-check.log"
 
 .NOTES
     Author: AuthSystem Team
@@ -26,8 +32,12 @@
 
 param (
     [string]$ContainerPrefix = "",
-    [switch]$Verbose
+    [switch]$Verbose,
+    [string]$LogFile = ""
 )
+
+# Set console output encoding to UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Configure error handling and verbose output
 if ($Verbose) {
@@ -38,23 +48,54 @@ if ($Verbose) {
     $ErrorActionPreference = "Stop"
 }
 
+# Set up logging
+if (-not $LogFile) {
+    $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $logDate = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+    $LogFile = Join-Path $scriptPath "logs\docker-health-check_$logDate.log"
+}
+
+# Create logs directory if it doesn't exist
+$logDirectory = Split-Path -Parent $LogFile
+if (-not (Test-Path $logDirectory)) {
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+}
+
+function Write-Log {
+    param (
+        [string]$Message,
+        [ValidateSet("INFO", "WARNING", "ERROR", "SUCCESS")]
+        [string]$Level = "INFO",
+        [ConsoleColor]$ForegroundColor = [ConsoleColor]::White
+    )
+    
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "[$timestamp] [$Level] $Message"
+    
+    # Write to console with color
+    Write-Host $logMessage -ForegroundColor $ForegroundColor
+    
+    # Write to log file
+    $logMessage | Out-File -FilePath $LogFile -Append
+}
+
 # Required containers for the system to function properly
 $requiredContainers = @(
     @{
         Type = "app"
-        NamePatterns = @("auth-service", "auth-service-dev", "auth-service-mailhog-test")
+        NamePatterns = @("auth-service-dev", "auth-service-test", "auth-service")
         Required = $true
-        HealthEndpoint = "http://localhost:3000/api/health"
+        HealthEndpoint = "http://localhost:3000/health"
     },
     @{
         Type = "database"
-        NamePatterns = @("mongodb", "mongodb-mailhog-test")
+        NamePatterns = @("mongodb-mailhog-test", "mongodb")
         Required = $true
         Port = 27017
     },
     @{
         Type = "mail"
-        NamePatterns = @("mailhog", "mailhog-test")
+        NamePatterns = @("mailhog-test", "mailhog")
         Required = $false # Not strictly required if using direct verification
         HealthEndpoint = "http://localhost:8025/api/v2/messages"
     }
@@ -76,13 +117,16 @@ function Test-TcpConnection {
         if ($wait) {
             $tcpClient.EndConnect($connection)
             $tcpClient.Close()
+            Write-Log "TCP connection to ${ComputerName}:${Port} successful" "INFO" Yellow
             return $true
         } else {
             $tcpClient.Close()
+            Write-Log "TCP connection to ${ComputerName}:${Port} timed out" "WARNING" Yellow
             return $false
         }
     }
     catch {
+        Write-Log "TCP connection error to ${ComputerName}:${Port} - $_" "ERROR" Red
         Write-Verbose "TCP connection error: $_"
         return $false
     }
@@ -97,9 +141,18 @@ function Test-HttpEndpoint {
     try {
         Write-Verbose "Testing HTTP endpoint: $Url"
         $response = Invoke-WebRequest -Uri $Url -TimeoutSec $Timeout -UseBasicParsing
-        return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400)
+        $statusOk = $response.StatusCode -ge 200 -and $response.StatusCode -lt 400
+        
+        if ($statusOk) {
+            Write-Log "HTTP endpoint $Url is healthy (Status: $($response.StatusCode))" "INFO" Green
+        } else {
+            Write-Log "HTTP endpoint $Url returned non-success status: $($response.StatusCode)" "WARNING" Yellow
+        }
+        
+        return $statusOk
     }
     catch {
+        Write-Log "HTTP endpoint error for $Url - $_" "ERROR" Red
         Write-Verbose "HTTP endpoint error: $_"
         return $false
     }
@@ -115,6 +168,7 @@ function Get-ContainerList {
         
         if ($Prefix) {
             $filter = "--filter name=$Prefix"
+            Write-Log "Filtering containers with prefix: $Prefix" "INFO" Cyan
         } else {
             $filter = ""
         }
@@ -135,13 +189,22 @@ function Get-ContainerList {
                 }
                 
                 $containerList += $containerInfo
+                
+                if ($containerInfo.Running) {
+                    Write-Log "Container $($containerInfo.Name) is running (ID: $($containerInfo.Id))" "INFO" Green
+                } else {
+                    Write-Log "Container $($containerInfo.Name) is not running (ID: $($containerInfo.Id))" "WARNING" Yellow
+                }
             }
         }
         
+        Write-Log "Found $($containerList.Count) containers" "INFO" Cyan
         return $containerList
     }
     catch {
-        Write-Error "Failed to get Docker container list: $_"
+        $errorMsg = "Failed to get Docker container list: $_"
+        Write-Log $errorMsg "ERROR" Red
+        Write-Error $errorMsg
         return @()
     }
 }
@@ -155,26 +218,31 @@ function Find-RequiredContainer {
     foreach ($pattern in $NamePatterns) {
         foreach ($container in $Containers) {
             if ($container.Name -match $pattern) {
+                Write-Log "Found container matching pattern '$pattern': $($container.Name)" "INFO" Green
                 return $container
             }
         }
     }
     
+    $patternsStr = $NamePatterns -join ", "
+    Write-Log "No container found matching patterns: $patternsStr" "WARNING" Yellow
     return $null
 }
 
 function Test-DockerEnvironment {
-    Write-Host "Checking Docker environment..." -ForegroundColor Cyan
+    Write-Log "Checking Docker environment..." "INFO" Cyan
     
     # Check if Docker is installed and running
     try {
         $dockerVersion = docker version --format '{{.Server.Version}}'
-        Write-Host "Docker version: $dockerVersion" -ForegroundColor Green
+        Write-Log "Docker is running - version: $dockerVersion" "SUCCESS" Green
     }
     catch {
+        $errorMsg = "Docker is not running or not installed. Error: $_"
+        Write-Log $errorMsg "ERROR" Red
         return @{
             Success = $false
-            Message = "Docker is not running or not installed. Error: $_"
+            Message = $errorMsg
             Containers = @()
         }
     }
@@ -211,17 +279,21 @@ function Test-DockerEnvironment {
                     $status.Healthy = Test-TcpConnection -ComputerName "localhost" -Port $requiredType.Port
                 } else {
                     $status.Healthy = $true # Assume healthy if no health check specified
+                    Write-Log "Container $($container.Name) assumed healthy (no health check specified)" "INFO" Green
                 }
             }
             
             # Log specific issues
             if (-not $status.Running) {
-                Write-Host "Container $($container.Name) is not running" -ForegroundColor Yellow
+                Write-Log "Container $($container.Name) is not running" "WARNING" Yellow
             } elseif (-not $status.Healthy) {
-                Write-Host "Container $($container.Name) is running but appears unhealthy" -ForegroundColor Yellow
+                Write-Log "Container $($container.Name) is running but appears unhealthy" "WARNING" Yellow
             }
         } else {
-            Write-Host "Required container of type $($requiredType.Type) not found (patterns: $($requiredType.NamePatterns -join ', '))" -ForegroundColor Yellow
+            $patternList = $requiredType.NamePatterns -join "', '"
+            $logLevel = if ($requiredType.Required) { "ERROR" } else { "WARNING" }
+            $color = if ($requiredType.Required) { "Red" } else { "Yellow" }
+            Write-Log "Required container of type $($requiredType.Type) not found (patterns: '$patternList')" $logLevel $color
         }
         
         $containerStatus += $status
@@ -245,22 +317,29 @@ function Test-DockerEnvironment {
 
 # If script is being run directly (not sourced), output results
 if ($MyInvocation.InvocationName -ne ".") {
+    Write-Log "Starting Docker health check..." "INFO" Cyan
+    Write-Log "Results will be saved to: $LogFile" "INFO" White
+    
     $result = Test-DockerEnvironment
     
     if ($result.Success) {
-        Write-Host "`n✅ Docker environment check passed" -ForegroundColor Green
+        Write-Log "Docker environment check passed!" "SUCCESS" Green
     } else {
-        Write-Host "`n❌ Docker environment check failed: $($result.Message)" -ForegroundColor Red
+        Write-Log "Docker environment check failed: $($result.Message)" "ERROR" Red
     }
     
-    Write-Host "`nContainer Status:" -ForegroundColor Cyan
+    Write-Log "Container Status Summary:" "INFO" Cyan
     foreach ($container in $result.Containers) {
         $statusColor = if ($container.Healthy) { "Green" } elseif (-not $container.Required) { "Yellow" } else { "Red" }
-        $statusSymbol = if ($container.Healthy) { "✓" } elseif (-not $container.Required) { "!" } else { "×" }
+        $statusLevel = if ($container.Healthy) { "SUCCESS" } elseif (-not $container.Required) { "WARNING" } else { "ERROR" }
+        $statusSymbol = if ($container.Healthy) { "Check" } elseif (-not $container.Required) { "!" } else { "x" }
+        $statusText = if ($container.Healthy) { "Healthy" } elseif ($container.Running) { "Unhealthy" } else { "Not Running" }
         
-        Write-Host "$statusSymbol $($container.Type): $($container.Name) - " -NoNewline
-        Write-Host $(if ($container.Healthy) { "Healthy" } elseif ($container.Running) { "Unhealthy" } else { "Not Running" }) -ForegroundColor $statusColor
+        Write-Log "$statusSymbol $($container.Type): $($container.Name) - $statusText" $statusLevel $statusColor
     }
+    
+    Write-Log "Docker health check completed." "INFO" Cyan
+    Write-Log "Detailed results saved to: $LogFile" "INFO" White
     
     return $result
 }

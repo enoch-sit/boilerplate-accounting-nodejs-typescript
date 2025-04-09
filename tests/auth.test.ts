@@ -5,9 +5,9 @@ import { MongoClient, Db } from 'mongodb';
 import { createInterface } from 'readline';
 
 // Update these configurations as needed
-const API_URL = 'http://localhost:3000/api';
-const MAILHOG_API = 'http://localhost:8025/api/v1';
-const MONGODB_URI = 'mongodb://localhost:27017/auth_db';
+const API_URL = process.env.API_URL || 'http://localhost:3000/api';
+const MAILHOG_API = process.env.MAILHOG_API || 'http://localhost:8025/api/v1';
+const MONGODB_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/auth_db';
 
 // Set to true to enable manual input for verification codes and tokens
 const USE_MANUAL_INPUT = true;

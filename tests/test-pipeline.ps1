@@ -357,7 +357,7 @@ if ($dockerAvailable -and -not $SkipDockerChecks -and -not $UnitTestsOnly) {
         
         Write-DebugInfo "Running MailHog service check" "MAILHOG" Cyan
         # Run the MailHog check
-        $mailhogStatus = Test-MailhogService
+        $mailhogStatus = Test-MailHogFunctionality
         
         if ($mailhogStatus.Success) {
             Write-StepResult -StepName "MailHog Service" -Success $true
@@ -373,6 +373,18 @@ if ($dockerAvailable -and -not $SkipDockerChecks -and -not $UnitTestsOnly) {
             Write-StepResult -StepName "MailHog Service" -Success $false -Details $mailhogStatus.Message
             Write-DebugInfo "MailHog service check failed: $($mailhogStatus.Message)" "MAILHOG" Red
             $mailhogAvailable = $false
+            
+            # Check if the container is found but stopped
+            $mailhogContainerStopped = $false
+            if ($dockerStatus -and $dockerStatus.Containers) {
+                $mailhogContainer = $dockerStatus.Containers | Where-Object { $_.Name -match "mailhog|auth-service-mailhog" }
+                if ($mailhogContainer -and -not $mailhogContainer.Running) {
+                    $mailhogContainerStopped = $true
+                    Write-Host "  - MailHog container found but not running. Try starting it with:" -ForegroundColor Yellow
+                    Write-Host "    docker start $($mailhogContainer.Name)" -ForegroundColor Yellow
+                    Write-DebugInfo "MailHog container found but stopped: $($mailhogContainer.Name)" "MAILHOG" Yellow
+                }
+            }
         }
     }
     catch {
@@ -385,7 +397,7 @@ if ($dockerAvailable -and -not $SkipDockerChecks -and -not $UnitTestsOnly) {
 else {
     if ($UnitTestsOnly) {
         Write-DebugInfo "MailHog check skipped due to -UnitTestsOnly parameter" "MAILHOG" Yellow
-    } elseif (not $dockerAvailable) {
+    } elseif (-not $dockerAvailable) {
         Write-DebugInfo "MailHog check skipped because Docker is not available" "MAILHOG" Yellow
     } else {
         Write-DebugInfo "MailHog check skipped due to -SkipDockerChecks parameter" "MAILHOG" Yellow

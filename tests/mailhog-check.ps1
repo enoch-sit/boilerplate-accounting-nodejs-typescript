@@ -80,7 +80,7 @@ function Send-TestEmail {
     )
     
     try {
-        Write-Verbose "Sending test email via SMTP to $SmtpServer:$Port"
+        Write-Verbose ("Sending test email via SMTP to {0}:{1}" -f $SmtpServer, $Port)
         
         # Generate a unique ID for tracking this email
         $uniqueId = [Guid]::NewGuid().ToString()

@@ -177,6 +177,8 @@ graph TB
 
 ### API Endpoints
 
+#### Auth Routes (`/api/auth`)
+
 | Endpoint                       | Method | Description                           | Access Level      |
 |--------------------------------|--------|---------------------------------------|-------------------|
 | `/api/auth/signup`             | POST   | Register a new user                   | Public            |
@@ -188,13 +190,37 @@ graph TB
 | `/api/auth/logout-all`         | POST   | Logout from all devices               | Authenticated     |
 | `/api/auth/forgot-password`    | POST   | Request password reset                | Public            |
 | `/api/auth/reset-password`     | POST   | Reset password with token             | Public            |
-| `/api/profile`                 | GET    | Get user profile                      | Authenticated     |
-| `/api/profile`                 | PUT    | Update user profile                   | Authenticated     |
-| `/api/change-password`         | POST   | Change password                       | Authenticated     |
+
+#### Protected Routes (`/api/protected`)
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/api/protected/profile`       | GET    | Get user profile                      | Authenticated     |
+| `/api/protected/profile`       | PUT    | Update user profile                   | Authenticated     |
+| `/api/protected/change-password`| POST  | Change password                       | Authenticated     |
+| `/api/protected/dashboard`     | GET    | Access protected dashboard content    | Authenticated     |
+
+#### Admin Routes (`/api/admin`)
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
 | `/api/admin/users`             | GET    | Get all users                         | Admin             |
-| `/api/admin/users/:id/role`    | PUT    | Update user role                      | Admin             |
+| `/api/admin/users/:userId/role`| PUT    | Update user role                      | Admin             |
 | `/api/admin/reports`           | GET    | Access reports                        | Admin/Supervisor  |
 | `/api/admin/dashboard`         | GET    | Access dashboard                      | Any Authenticated |
+
+#### Testing Routes (`/api/testing`) - Development Only
+
+| Endpoint                                | Method | Description                           | Access Level      |
+|-----------------------------------------|--------|---------------------------------------|-------------------|
+| `/api/testing/verification-token/:userId/:type?` | GET  | Get verification token for a user     | Development       |
+| `/api/testing/verify-user/:userId`      | POST   | Directly verify a user without token  | Development       |
+
+#### Miscellaneous Endpoints
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/health`                      | GET    | Health check endpoint                 | Public            |
 
 ## Authentication Workflows
 

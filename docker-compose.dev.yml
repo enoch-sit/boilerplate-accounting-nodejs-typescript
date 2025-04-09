@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   auth-service:
     build:
@@ -35,6 +33,7 @@ services:
       - /app/node_modules
     environment:
       - MONGO_URI=mongodb://mongodb:27017/auth_test
+      - MAILHOG_API=http://localhost:8025/api/v1
       - JWT_SECRET=test_secret_key
       - NODE_ENV=test
       - BYPASS_MAILHOG=true
@@ -48,7 +47,7 @@ services:
     image: mongo:latest
     container_name: mongodb
     ports:
-      - "27017:27017"
+      - "27018:27017" # Maps container port 27017 to host port 27018
     volumes:
       - mongo-data:/data/db
 

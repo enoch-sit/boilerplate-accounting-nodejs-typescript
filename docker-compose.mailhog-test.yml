@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   auth-service-mailhog-test:
     build:
@@ -31,7 +29,7 @@ services:
     image: mongo:latest
     container_name: mongodb-mailhog-test
     ports:
-      - "27018:27017"  # Different port to avoid conflicts
+      - "27018:27017" # Maps container port 27017 to host port 27018
     volumes:
       - mongo-mailhog-data:/data/db
 
