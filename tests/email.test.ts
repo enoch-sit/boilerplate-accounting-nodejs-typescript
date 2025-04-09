@@ -3,16 +3,42 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import nodemailer from 'nodemailer';
-import app from '../src/app';
 import { Verification, VerificationType } from '../src/models/verification.model';
 import { User } from '../src/models/user.model';
 import axios from 'axios';
 
+// Mock the database connection to prevent app from connecting to real MongoDB
+jest.mock('../src/config/db.config', () => ({
+  connectDB: jest.fn().mockResolvedValue(true)
+}));
+
 // Mock nodemailer
 jest.mock('nodemailer');
 
+// Need to declare app variable before import to avoid type errors
+let app: any;
+
+// Create mock for the email transporter
+const mockTransporter = {
+  sendMail: jest.fn().mockResolvedValue({
+    messageId: 'test-message-id'
+  }),
+  verify: jest.fn().mockResolvedValue(true)
+};
+
+// Mock email config to return our mock transporter
+jest.mock('../src/config/email.config', () => ({
+  initializeEmailTransporter: jest.fn(),
+  getEmailTransporter: jest.fn().mockReturnValue(mockTransporter)
+}));
+
+// Set environment variables for testing
+process.env.NODE_ENV = 'test';
+process.env.JWT_ACCESS_SECRET = 'test-secret';
+process.env.JWT_REFRESH_SECRET = 'test-secret';
+
 // Configuration for tests
-const MAILHOG_API = process.env.MAILHOG_API || 'http://mailhog:8025';
+const MAILHOG_API = process.env.MAILHOG_API || 'http://localhost:8025';
 const TEST_USER_EMAIL = 'test@example.com';
 const TEST_USER_PASSWORD = 'TestPassword123!';
 
@@ -22,45 +48,43 @@ describe('Email Verification Tests with MailHog', () => {
   
   // Setup function to run before all tests
   beforeAll(async () => {
-    // Use MongoDB Memory Server for tests
+    // Create in-memory MongoDB instance
     mongoServer = await MongoMemoryServer.create();
-    const mongoUri = mongoServer.getUri();
-    await mongoose.connect(mongoUri);
+    process.env.MONGODB_URI = mongoServer.getUri();
     
-    // Configure nodemailer to use MailHog for testing
-    const mockTransporter = {
-      sendMail: jest.fn().mockImplementation((mailOptions) => {
-        console.log('Sending test email:', mailOptions);
-        return Promise.resolve({
-          messageId: 'test-message-id'
-        });
-      }),
-      verify: jest.fn().mockResolvedValue(true)
-    };
+    // Connect mongoose to the in-memory database
+    await mongoose.connect(mongoServer.getUri());
     
-    (nodemailer.createTransport as jest.Mock).mockReturnValue(mockTransporter);
+    // Import app after mocking dependencies
+    app = require('../src/app').default;
   });
   
   // Cleanup after all tests
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    // Disconnect and close the in-memory MongoDB instance
+    if (mongoose.connection) await mongoose.disconnect();
+    if (mongoServer) await mongoServer.stop();
   });
   
-  // Clear database between tests
+  // Clear database and reset mocks between tests
   beforeEach(async () => {
+    // Clear collections
     await User.deleteMany({});
     await Verification.deleteMany({});
     
-    // Clear MailHog messages
+    // Reset mock call history
+    mockTransporter.sendMail.mockClear();
+    
+    // Clear MailHog messages if available
     try {
       await axios.delete(`${MAILHOG_API}/api/v1/messages`);
     } catch (error) {
-      console.warn('Could not clear MailHog messages. MailHog might not be available:', error);
+      // If MailHog is not available, just continue with the test
+      console.warn('MailHog not available. Testing will continue without clearing messages.');
     }
   });
   
-  // Test user registration sends verification email
+  // Test 1: User registration sends verification email
   test('User registration sends verification email to MailHog', async () => {
     // Register new user
     const response = await request(app)
@@ -75,38 +99,28 @@ describe('Email Verification Tests with MailHog', () => {
     expect(response.body).toHaveProperty('userId');
     testUserId = response.body.userId;
     
-    // Wait for email to be sent and processed
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Verify email sending was triggered
+    expect(mockTransporter.sendMail).toHaveBeenCalled();
     
-    // Verify email was sent
-    try {
-      const mailhogResponse = await axios.get(`${MAILHOG_API}/api/v2/messages`);
-      const messages = mailhogResponse.data.items;
-      
-      expect(messages.length).toBeGreaterThan(0);
-      
-      // Find our message
-      const ourMessage = messages.find((msg: any) => 
-        msg.Content.Headers.To && 
-        msg.Content.Headers.To.some((to: string) => to.includes(TEST_USER_EMAIL))
-      );
-      
-      expect(ourMessage).toBeDefined();
-      expect(ourMessage.Content.Body).toContain('verification');
-    } catch (error) {
-      console.error('Error checking MailHog:', error);
-      // If MailHog is not available, check that a verification was created in the database instead
-      const verification = await Verification.findOne({ 
-        userId: testUserId,
-        type: VerificationType.EMAIL
-      });
-      
-      expect(verification).toBeDefined();
-      expect(verification).toHaveProperty('token');
-    }
+    // Check email was sent with correct data
+    const emailCalls = mockTransporter.sendMail.mock.calls;
+    const sentEmail = emailCalls.find((call: any) => call[0].to === TEST_USER_EMAIL);
+    
+    expect(sentEmail).toBeDefined();
+    expect(sentEmail[0].subject).toContain('Verify');
+    expect(sentEmail[0].html).toContain('verify');
+    
+    // Verify a verification record was created in database
+    const verification = await Verification.findOne({ 
+      userId: testUserId,
+      type: VerificationType.EMAIL
+    });
+    
+    expect(verification).toBeDefined();
+    expect(verification).toHaveProperty('token');
   });
   
-  // Test email verification flow with token from database
+  // Test 2: Email verification flow with token from database
   test('Email verification flow works with token from database', async () => {
     // Register new user
     const signupResponse = await request(app)
@@ -155,7 +169,7 @@ describe('Email Verification Tests with MailHog', () => {
     expect(loginResponse.body).toHaveProperty('accessToken');
   });
   
-  // Test password reset flow
+  // Test 3: Password reset flow
   test('Password reset flow with MailHog', async () => {
     // Create and verify a user first
     const user = new User({
@@ -176,6 +190,15 @@ describe('Email Verification Tests with MailHog', () => {
     
     expect(forgotResponse.status).toBe(200);
     
+    // Verify reset email was sent
+    expect(mockTransporter.sendMail).toHaveBeenCalled();
+    const emailCalls = mockTransporter.sendMail.mock.calls;
+    const resetEmail = emailCalls.find((call: any) => 
+      call[0].to === 'reset@example.com' && 
+      call[0].subject.includes('Reset')
+    );
+    expect(resetEmail).toBeDefined();
+    
     // Get reset token from database
     const resetVerification = await Verification.findOne({
       userId: user._id,
@@ -191,7 +214,7 @@ describe('Email Verification Tests with MailHog', () => {
       .post('/api/auth/reset-password')
       .send({
         token: resetVerification!.token,
-        newPassword: newPassword
+        newPassword
       });
     
     expect(resetResponse.status).toBe(200);

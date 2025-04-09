@@ -256,7 +256,7 @@ if ($MyInvocation.InvocationName -ne ".") {
     Write-Host "`nContainer Status:" -ForegroundColor Cyan
     foreach ($container in $result.Containers) {
         $statusColor = if ($container.Healthy) { "Green" } elseif (-not $container.Required) { "Yellow" } else { "Red" }
-        $statusSymbol = if ($container.Healthy) { "✅" } elseif (-not $container.Required) { "⚠️" } else { "❌" }
+        $statusSymbol = if ($container.Healthy) { "✓" } elseif (-not $container.Required) { "!" } else { "×" }
         
         Write-Host "$statusSymbol $($container.Type): $($container.Name) - " -NoNewline
         Write-Host $(if ($container.Healthy) { "Healthy" } elseif ($container.Running) { "Unhealthy" } else { "Not Running" }) -ForegroundColor $statusColor
