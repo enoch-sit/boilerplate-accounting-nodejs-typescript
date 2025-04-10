@@ -10,7 +10,8 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
 4. [Production Deployment Testing](#production-deployment-testing)
 5. [Real Email Verification Testing](#real-email-verification-testing)
 6. [Testing Admin User Creation API](#testing-admin-user-creation-api)
-7. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+7. [Architecture Compatibility Issues](#architecture-compatibility-issues)
+8. [Troubleshooting Common Issues](#troubleshooting-common-issues)
 
 ## Development Testing in Docker
 
@@ -362,6 +363,63 @@ python tests/deploy_test.py --url http://auth-service:3000 --admin-test true
    - The system prevents duplicate emails to maintain data integrity
 
 By following these testing steps, you can verify that the admin user creation API works correctly in different environments.
+
+## Architecture Compatibility Issues
+
+When running the authentication system in Docker containers across different architectures (like x86 vs ARM), you may encounter compatibility issues with native modules.
+
+### Native Module Issues
+
+1. **Symptoms of Native Module Problems**:
+   - Connection errors when trying to access API endpoints
+   - Errors in logs containing messages like "Exec format error" 
+   - Issues appearing after changing development machines or Docker environments
+
+2. **Particularly Problematic Modules**:
+   - bcrypt: A common password-hashing library with native dependencies
+   - node-gyp based modules: Many modules that require compilation
+   - Modules with C/C++ bindings
+
+### Prevention and Solutions
+
+1. **Use Pure JavaScript Alternatives**:
+   - bcryptjs: Pure JS implementation of bcrypt
+   - Other pure JS modules when available
+
+2. **Ensure Proper Build Environment**:
+   - Include proper build tools in your Dockerfile:
+     ```dockerfile
+     # Install build essentials
+     RUN apk add --no-cache python3 make g++ 
+     ```
+
+3. **Rebuild Native Modules**:
+   - For some modules, explicitly rebuilding can help:
+     ```dockerfile
+     RUN npm rebuild <module-name> --build-from-source
+     ```
+
+### Testing Across Architectures
+
+1. **Test on Different Environments**:
+   - Test on both x86 (Intel/AMD) and ARM (M1/M2 Mac) machines
+   - Use Docker's multi-platform build capabilities for production images
+
+2. **Local Development Checks**:
+   ```powershell
+   # Check container architecture
+   docker exec auth-service-dev uname -m
+   
+   # Check Node.js binary architecture
+   docker exec auth-service-dev node -p process.arch
+   ```
+
+3. **Handling Mixed Development Teams**:
+   - Document architecture requirements
+   - Prefer architecture-agnostic dependencies
+   - Consider using Docker multi-platform images
+
+For a detailed case study on solving bcrypt architecture issues in this project, see the [BcryptArchitectureCompatibility.md](../DebugTrack/BcryptArchitectureCompatibility.md) document in the DebugTrack folder.
 
 ## Troubleshooting Common Issues
 

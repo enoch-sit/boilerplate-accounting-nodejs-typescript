@@ -1,6 +1,6 @@
 // src/models/user.model.ts
 import mongoose, { Document, Schema, Types } from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs'; // Changed from bcrypt to bcryptjs
 
 // Define user roles
 export enum UserRole {
