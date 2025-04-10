@@ -10,8 +10,10 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
 4. [Production Deployment Testing](#production-deployment-testing)
 5. [Real Email Verification Testing](#real-email-verification-testing)
 6. [Testing Admin User Creation API](#testing-admin-user-creation-api)
-7. [Architecture Compatibility Issues](#architecture-compatibility-issues)
-8. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+7. [Testing Admin Authentication and Authorization](#testing-admin-authentication-and-authorization)
+8. [Architecture Compatibility Issues](#architecture-compatibility-issues)
+9. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+10. [Understanding Deployment Test Reports](#understanding-deployment-test-reports)
 
 ## Development Testing in Docker
 
@@ -37,6 +39,57 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
 3. **Access Service Endpoints**:
    - API Endpoint: http://localhost:3000/api
    - MailHog UI: http://localhost:8025
+
+### Force Rebuilding Docker Containers
+
+When you need to ensure your container has the latest dependencies or configuration changes, you may need to force rebuild:
+
+1. **Rebuild All Services**:
+   ```powershell
+   # Force rebuild and start development containers
+   docker-compose -f docker-compose.dev.yml up --build
+   
+   # For detached mode
+   docker-compose -f docker-compose.dev.yml up -d --build
+   ```
+
+2. **Rebuild a Specific Service**:
+   ```powershell
+   # Rebuild only the auth-service
+   docker-compose -f docker-compose.dev.yml build auth-service
+   
+   # Then start the services
+   docker-compose -f docker-compose.dev.yml up
+   ```
+
+3. **Rebuild and Run Test Service**:
+   ```powershell
+   # Rebuild and run the test service
+   docker-compose -f docker-compose.dev.yml run --rm --build auth-test
+   
+   # Run specific tests after rebuilding
+   docker-compose -f docker-compose.dev.yml run --rm --build auth-test npm test -- -t "Role-Based Access Control Tests"
+   ```
+
+4. **Complete Clean Rebuild**:
+   ```powershell
+   # Stop and remove all containers, networks, and volumes
+   docker-compose -f docker-compose.dev.yml down -v
+   
+   # Remove any dangling images
+   docker system prune -f
+   
+   # Rebuild and start from scratch
+   docker-compose -f docker-compose.dev.yml up --build
+   ```
+
+#### When to Force Rebuild
+
+- After updating dependencies in package.json
+- When switching between different development environments (x86/ARM)
+- After modifying Dockerfile.dev or docker-compose configuration
+- When troubleshooting native Node.js module issues like bcrypt
+- When making significant changes to the application structure
 
 ### Network Configuration for Windows
 
@@ -364,6 +417,162 @@ python tests/deploy_test.py --url http://auth-service:3000 --admin-test true
 
 By following these testing steps, you can verify that the admin user creation API works correctly in different environments.
 
+## Testing Admin Authentication and Authorization
+
+### Admin Credentials Setup for Testing
+
+When testing the admin functionality of the system, you'll need to access endpoints that require admin privileges. Here's how to set up and test admin credentials:
+
+#### Setting Up an Admin User for Testing
+
+1. **Initial Admin User Creation**:
+   
+   There's no initial admin user seeded in the database by default. For testing, you need to create one:
+
+   ```bash
+   # First, create a regular user through the signup endpoint
+   curl -X POST http://localhost:3000/api/auth/signup \
+     -H "Content-Type: application/json" \
+     -d '{
+       "username": "admin",
+       "email": "admin@example.com",
+       "password": "AdminPassword123!"
+     }'
+   ```
+
+2. **Convert the User to Admin**:
+   
+   You must update the user's role directly in the database. This is by design - even admin users cannot create other admin users through the API to prevent privilege escalation.
+
+   ```bash
+   # Access the MongoDB container
+   docker exec -it auth-mongodb mongosh
+   
+   # In the MongoDB shell:
+   use auth_db
+   
+   # Update the user role and verify the email (both required steps)
+   db.users.updateOne(
+     { username: "admin" },
+     { $set: { role: "admin", isVerified: true } }
+   )
+   
+   # You should see the confirmation:
+   # { "acknowledged": true, "matchedCount": 1, "modifiedCount": 1 }
+   
+   # Verify the update was successful:
+   db.users.findOne({ username: "admin" })
+   
+   # Exit MongoDB shell
+   exit
+   ```
+
+   **Why this works**: The User model in MongoDB has a `role` field that defaults to "enduser". By updating this field to "admin", you're granting the user admin privileges. The `isVerified` field needs to be set to true to allow the user to log in.
+
+#### Using the Deploy Test Script with Admin Testing
+
+The `deploy_test.py` script includes support for testing admin functionality:
+
+```bash
+# Run the deployment tests including admin API testing
+python deploy_test.py --url http://localhost:3000 --admin-test true
+```
+
+When running with the `--admin-test` flag:
+
+1. The script will attempt to log in with default admin credentials (`admin`/`AdminPassword123!`)
+2. If that fails, it will prompt for admin credentials
+3. After successful login, it will test admin-specific endpoints:
+   - Creating new users with different roles
+   - Listing all users in the system
+
+#### Understanding the Admin Test Failures
+
+If the admin test fails with `[FAIL] Admin Login`, it's typically because:
+
+1. **No admin user exists**: Follow the steps above to create one
+2. **Wrong credentials**: Verify the username and password
+3. **Admin user is not verified**: Check the `isVerified` field in the database
+
+### Testing Role-Based Access Control
+
+The system has three roles with a hierarchical permission structure:
+
+1. `admin`: Full system access
+2. `supervisor`: Limited administrative features
+3. `enduser` (or `user`): Basic functionality only
+
+To test this hierarchy:
+
+```bash
+# Create test users with different roles
+python deploy_test.py --url http://localhost:3000 --admin-test true
+```
+
+#### Understanding How Roles Work in the Codebase
+
+The role-based system works through:
+
+1. **Role Storage**: Roles are stored in the User document in MongoDB
+   ```javascript
+   // In user.model.ts:
+   export enum UserRole {
+     ADMIN = 'admin',
+     SUPERVISOR = 'supervisor',
+     ENDUSER = 'enduser',
+     USER = 'enduser'  // USER is an alias for ENDUSER
+   }
+   ```
+
+2. **JWT Token Inclusion**: When tokens are generated, the role is included:
+   ```javascript
+   // In token.service.ts:
+   const payload = { sub: userId, username, type: 'access', role };
+   ```
+
+3. **Middleware Protection**: Routes are protected by role-checking middleware:
+   ```javascript
+   // In auth.middleware.ts
+   export const requireAdmin = (req, res, next) => {
+     if (req.user.role !== UserRole.ADMIN) {
+       return res.status(403).json({ error: 'Admin access required' });
+     }
+     next();
+   };
+   ```
+
+Understanding these components helps in debugging authorization issues during testing.
+
+### Troubleshooting Admin Authentication
+
+If you encounter issues with admin authentication during testing:
+
+1. **Database Role Verification**:
+   ```bash
+   docker exec -it auth-mongodb mongosh
+   use auth_db
+   db.users.find({ username: "admin" }).pretty()
+   ```
+   Ensure that `role` is set to "admin" and `isVerified` is `true`.
+
+2. **API Response Debugging**:
+   Add verbose logging to your test requests:
+   ```bash
+   curl -v -X POST http://localhost:3000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"AdminPassword123!"}'
+   ```
+
+3. **Token Validation**:
+   Decode a JWT token to check role inclusion:
+   ```bash
+   npm install -g jwt-cli
+   jwt decode YOUR_TOKEN
+   ```
+   Verify that the payload contains `"role": "admin"`.
+
+Remember that any change to the role system requires updates to the role enumeration, middleware, and potentially the database schema to ensure consistent behavior.
+
 ## Architecture Compatibility Issues
 
 When running the authentication system in Docker containers across different architectures (like x86 vs ARM), you may encounter compatibility issues with native modules.
@@ -488,3 +697,205 @@ docker-compose -f docker-compose.dev.yml logs mongodb
 # View MailHog logs
 docker-compose -f docker-compose.dev.yml logs mailhog
 ```
+
+## Understanding Deployment Test Reports
+
+The `deploy_test.py` script generates detailed JSON reports that provide valuable insight into your authentication system's functionality. These reports are automatically saved in the `tests` directory with timestamped filenames (e.g., `deploy_test_report_20250410_153937.json`).
+
+### Example Test Report
+
+Here's an example of what a test report looks like:
+
+```json
+{
+  "api_url": "http://localhost:3000",
+  "test_date": "2025-04-10 15:39:37",
+  "passed": 9,
+  "total": 10,
+  "pass_rate": 90.0,
+  "results": [
+    {
+      "test": "Health Check",
+      "passed": true,
+      "timestamp": "2025-04-10 15:38:43"
+    },
+    {
+      "test": "User Sign Up",
+      "passed": true,
+      "timestamp": "2025-04-10 15:38:43",
+      "details": "User ID: 67f7758352bcb71ef4800533"
+    },
+    {
+      "test": "Email Verification",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:04",
+      "details": "Status code: 200, Response: {\"message\":\"Email verified successfully\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:04",
+      "details": "Tokens received"
+    },
+    {
+      "test": "Access Protected Route",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:04",
+      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"67f7758352bcb71ef4800533\",\"username\":\"testuser_0ad2a571\",\"email\":\"test.0ad2a571@exam..."
+    },
+    {
+      "test": "Refresh Token",
+      "passed": false,
+      "timestamp": "2025-04-10 15:39:04",
+      "details": "Token refresh failed"
+    },
+    {
+      "test": "Request Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:22",
+      "details": "Status code: 200, Response: {\"message\":\"If your email exists in our system, you will receive a password reset link\"}"
+    },
+    {
+      "test": "Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:37",
+      "details": "Status code: 200, Response: {\"message\":\"Password reset successful\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:37",
+      "details": "Tokens received"
+    },
+    {
+      "test": "User Logout",
+      "passed": true,
+      "timestamp": "2025-04-10 15:39:37",
+      "details": "Status code: 200, Response: {\"message\":\"Logout successful\"}"
+    }
+  ]
+}
+```
+
+### Analyzing Test Results
+
+The report provides an overall summary (pass rate, total tests) and detailed results for each test case:
+
+1. **Test Name**: Indicates which functionality was tested
+2. **Passed Status**: Whether the test passed (`true`) or failed (`false`)
+3. **Timestamp**: When the test was executed
+4. **Details**: Response data or error information
+
+### Identifying and Fixing Common Issues
+
+#### Token Refresh Failures
+
+In the example report, the "Refresh Token" test failed. This is a common issue that could be caused by:
+
+1. **JWT Secret Mismatch**: Verify that `JWT_REFRESH_SECRET` is consistently set across all environments
+2. **Token Expiration Configuration**: Check that `JWT_REFRESH_EXPIRES_IN` is properly configured
+3. **Database Storage Issues**: Ensure refresh tokens are properly stored in the database
+4. **Token Service Implementation**: Review `token.service.ts` for any implementation issues
+
+To troubleshoot:
+
+```bash
+# Check environment variables in your running container
+docker exec auth-service-dev printenv | grep JWT
+
+# View token service logs
+docker logs auth-service-dev | grep "token service"
+
+# Check for MongoDB connectivity issues
+docker logs auth-service-dev | grep "MongoDB"
+```
+
+#### Email Verification Issues
+
+If the "Email Verification" test fails:
+
+1. **Check MailHog UI**: Visit http://localhost:8025 to see if verification emails are being sent
+2. **Verify Token Generation**: Look for logs about verification token creation
+3. **Database Connectivity**: Ensure the Verification model can access MongoDB
+
+#### User Registration Problems
+
+If "User Sign Up" fails:
+
+1. **Database Connection**: Verify MongoDB is accessible
+2. **Unique Constraints**: Check if username/email already exists
+3. **Validation Rules**: Ensure password meets complexity requirements
+
+### Running Tests with Different Parameters
+
+To focus on specific issues, you can run the deploy test with various options:
+
+```bash
+# Run only authentication tests
+python deploy_test.py --url http://localhost:3000 --auth-only
+
+# Run tests with verbose output
+python deploy_test.py --url http://localhost:3000 --verbose
+
+# Run admin-specific tests
+python deploy_test.py --url http://localhost:3000 --admin-test true
+```
+
+### Tracking Report History
+
+Keeping historical test reports is valuable for tracking system stability:
+
+```bash
+# Create a reports directory
+mkdir -p test-reports
+
+# Copy reports with timestamp-based organization
+cp tests/deploy_test_report_*.json test-reports/
+
+# Compare latest report with previous
+diff test-reports/deploy_test_report_20250410_153937.json test-reports/deploy_test_report_20250410_161045.json
+```
+
+### Automated Report Analysis
+
+For continuous integration, you can create a script to analyze reports:
+
+```python
+import json
+import sys
+import glob
+import os
+
+def analyze_reports(directory="./tests"):
+    reports = glob.glob(f"{directory}/deploy_test_report_*.json")
+    reports.sort(key=os.path.getmtime, reverse=True)
+    
+    if not reports:
+        print("No test reports found")
+        return 1
+    
+    # Load latest report
+    with open(reports[0], 'r') as f:
+        latest = json.load(f)
+    
+    print(f"Latest report: {os.path.basename(reports[0])}")
+    print(f"Pass rate: {latest['pass_rate']}%")
+    
+    # Find failed tests
+    failures = [r for r in latest['results'] if not r['passed']]
+    if failures:
+        print("\nFailed tests:")
+        for failure in failures:
+            print(f"  - {failure['test']}: {failure.get('details', 'No details')}")
+        return 1
+    
+    print("All tests passed!")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(analyze_reports())
+```
+
+## Troubleshooting Common Test Failures
+
+// ...existing code...

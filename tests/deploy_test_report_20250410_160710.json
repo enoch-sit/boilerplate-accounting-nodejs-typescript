@@ -1,0 +1,68 @@
+{
+  "api_url": "http://localhost:3000",
+  "test_date": "2025-04-10 16:07:10",
+  "passed": 10,
+  "total": 10,
+  "pass_rate": 100.0,
+  "results": [
+    {
+      "test": "Health Check",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:43"
+    },
+    {
+      "test": "User Sign Up",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:43",
+      "details": "User ID: 67f77c1352bcb71ef4800584"
+    },
+    {
+      "test": "Email Verification",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:53",
+      "details": "Status code: 200, Response: {\"message\":\"Email verified successfully\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:53",
+      "details": "Tokens received"
+    },
+    {
+      "test": "Access Protected Route",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:53",
+      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"67f77c1352bcb71ef4800584\",\"username\":\"testuser_285dc053\",\"email\":\"test.285dc053@exam..."
+    },
+    {
+      "test": "Refresh Token",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:53",
+      "details": "New access token received: eyJhbGciOiJIUzI..."
+    },
+    {
+      "test": "Request Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 16:06:58",
+      "details": "Status code: 200, Response: {\"message\":\"If your email exists in our system, you will receive a password reset link\"}"
+    },
+    {
+      "test": "Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 16:07:09",
+      "details": "Status code: 200, Response: {\"message\":\"Password reset successful\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 16:07:10",
+      "details": "Tokens received"
+    },
+    {
+      "test": "User Logout",
+      "passed": true,
+      "timestamp": "2025-04-10 16:07:10",
+      "details": "Status code: 200, Response: {\"message\":\"Logout successful\"}"
+    }
+  ]
+}

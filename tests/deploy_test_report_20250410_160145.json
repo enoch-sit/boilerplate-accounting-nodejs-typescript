@@ -1,0 +1,68 @@
+{
+  "api_url": "http://localhost:3000",
+  "test_date": "2025-04-10 16:01:45",
+  "passed": 9,
+  "total": 10,
+  "pass_rate": 90.0,
+  "results": [
+    {
+      "test": "Health Check",
+      "passed": true,
+      "timestamp": "2025-04-10 16:00:49"
+    },
+    {
+      "test": "User Sign Up",
+      "passed": true,
+      "timestamp": "2025-04-10 16:00:49",
+      "details": "User ID: 67f77ab152bcb71ef4800569"
+    },
+    {
+      "test": "Email Verification",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:03",
+      "details": "Status code: 200, Response: {\"message\":\"Email verified successfully\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:03",
+      "details": "Tokens received"
+    },
+    {
+      "test": "Access Protected Route",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:03",
+      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"67f77ab152bcb71ef4800569\",\"username\":\"testuser_6dc60623\",\"email\":\"test.6dc60623@exam..."
+    },
+    {
+      "test": "Refresh Token",
+      "passed": false,
+      "timestamp": "2025-04-10 16:01:03",
+      "details": "Token refresh failed"
+    },
+    {
+      "test": "Request Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:33",
+      "details": "Status code: 200, Response: {\"message\":\"If your email exists in our system, you will receive a password reset link\"}"
+    },
+    {
+      "test": "Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:44",
+      "details": "Status code: 200, Response: {\"message\":\"Password reset successful\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:44",
+      "details": "Tokens received"
+    },
+    {
+      "test": "User Logout",
+      "passed": true,
+      "timestamp": "2025-04-10 16:01:45",
+      "details": "Status code: 200, Response: {\"message\":\"Logout successful\"}"
+    }
+  ]
+}
