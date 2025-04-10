@@ -26,14 +26,14 @@ flowchart TB
     
     User(("User"))
     
-    User --|1. Authentication Request|--> AuthService
-    AuthService --|2. Query User Data|--> Database
-    Database --|3. Return User Data|--> AuthService
-    AuthService --|4. Issue JWT|--> User
-    User --|5. Request with JWT|--> ALB
-    ALB --|6. Forward Request with JWT|--> ChatbotApp
-    ChatbotApp --|7. Validate JWT using Shared Secret|--> ChatbotApp
-    ChatbotApp --|8. Response|--> User
+    User -->|1. Authentication Request| AuthService
+    AuthService -->|2. Query User Data| Database
+    Database -->|3. Return User Data| AuthService
+    AuthService -->|4. Issue JWT| User
+    User -->|5. Request with JWT| ALB
+    ALB -->|6. Forward Request with JWT| ChatbotApp
+    ChatbotApp -->|7. Validate JWT using Shared Secret| ChatbotApp
+    ChatbotApp -->|8. Response| User
     
     classDef aws fill:#FF9900,stroke:#232F3E,color:white;
     class ALB,ChatbotApp aws;
