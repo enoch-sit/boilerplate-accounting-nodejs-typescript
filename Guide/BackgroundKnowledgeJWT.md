@@ -321,5 +321,3 @@ This implementation provides a secure authentication system with these benefits:
 4. **Statelessness**: No session state needs to be maintained
 
 Remember that JWT secrets are highly sensitive. Always follow best practices for secret management, use proper key lengths, and implement a robust rotation strategy for your production environment.
-
-Would you like me to explain or break down any specific part of this implementation in more detail?
