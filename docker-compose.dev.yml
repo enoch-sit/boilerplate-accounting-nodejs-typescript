@@ -33,7 +33,7 @@ services:
       - /app/node_modules
     environment:
       - MONGO_URI=mongodb://mongodb:27017/auth_test
-      - MAILHOG_API=http://localhost:8025/api/v1
+      - MAILHOG_API=http://mailhog:8025/api/v1
       - JWT_SECRET=test_secret_key
       - NODE_ENV=test
       - BYPASS_MAILHOG=true

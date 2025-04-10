@@ -20,6 +20,7 @@ services:
       - EMAIL_FROM=test@auth-example.com
       - BYPASS_MAILHOG=false  # Explicitly use MailHog
       - TEST_EMAIL_VERIFICATION=true
+      - MAILHOG_API=http://mailhog:8025/api/v1
     depends_on:
       - mongodb
       - mailhog

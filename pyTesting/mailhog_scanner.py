@@ -43,6 +43,10 @@ formatter = logging.Formatter('%(message)s')
 console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
+# Default MailHog ports
+DEFAULT_SMTP_PORT = 1025
+DEFAULT_HTTP_PORT = 8025
+
 def check_tcp_port(host, port, timeout=1):
     """Check if a TCP port is open."""
     try:
@@ -111,6 +115,58 @@ def is_mailhog_api(url):
     except:
         return False, None, None
 
+def check_default_mailhog_instance(host="localhost"):
+    """Check if MailHog is running on default ports."""
+    print(f"{Fore.CYAN}Checking default MailHog ports on {host}...{Style.RESET_ALL}")
+    logging.info(f"Checking default MailHog ports on {host}")
+    
+    smtp_port_open = check_tcp_port(host, DEFAULT_SMTP_PORT)
+    http_port_open = check_tcp_port(host, DEFAULT_HTTP_PORT)
+    
+    if not smtp_port_open and not http_port_open:
+        print(f"{Fore.YELLOW}No services found on default MailHog ports.{Style.RESET_ALL}")
+        logging.info("No services found on default MailHog ports")
+        return None
+    
+    instance = {}
+    
+    # Check SMTP port
+    if smtp_port_open:
+        if is_smtp_port(host, DEFAULT_SMTP_PORT):
+            print(f"{Fore.GREEN}Found MailHog SMTP service on port {DEFAULT_SMTP_PORT}{Style.RESET_ALL}")
+            logging.info(f"Found MailHog SMTP service on port {DEFAULT_SMTP_PORT}")
+            instance["smtp_port"] = DEFAULT_SMTP_PORT
+        else:
+            print(f"{Fore.YELLOW}Port {DEFAULT_SMTP_PORT} is open but doesn't appear to be MailHog SMTP{Style.RESET_ALL}")
+            logging.info(f"Port {DEFAULT_SMTP_PORT} is open but doesn't appear to be MailHog SMTP")
+    
+    # Check HTTP/API port
+    if http_port_open:
+        url = f"http://{host}:{DEFAULT_HTTP_PORT}"
+        is_api, api_version, api_path = is_mailhog_api(url)
+        
+        if is_api:
+            print(f"{Fore.GREEN}Found MailHog API (v{api_version}) on port {DEFAULT_HTTP_PORT}{Style.RESET_ALL}")
+            logging.info(f"Found MailHog API (v{api_version}) on port {DEFAULT_HTTP_PORT}")
+            instance["api_port"] = DEFAULT_HTTP_PORT
+            instance["api_version"] = api_version
+            instance["api_url"] = f"{url}{api_path}"
+            instance["web_ui"] = url
+        else:
+            print(f"{Fore.YELLOW}Port {DEFAULT_HTTP_PORT} is open but doesn't appear to be MailHog API{Style.RESET_ALL}")
+            logging.info(f"Port {DEFAULT_HTTP_PORT} is open but doesn't appear to be MailHog API")
+    
+    # Return instance if both SMTP and API are found
+    if "smtp_port" in instance and "api_port" in instance:
+        print(f"{Fore.GREEN}Found complete MailHog instance on default ports!{Style.RESET_ALL}")
+        logging.info("Found complete MailHog instance on default ports")
+        return [instance]
+    elif "smtp_port" in instance or "api_port" in instance:
+        print(f"{Fore.YELLOW}Found partial MailHog services on default ports{Style.RESET_ALL}")
+        logging.info("Found partial MailHog services on default ports")
+    
+    return None
+
 def scan_mailhog_ports(host="localhost", port_range=(1024, 10000)):
     """
     Scan for MailHog instances on the given host within the specified port range.
@@ -119,6 +175,11 @@ def scan_mailhog_ports(host="localhost", port_range=(1024, 10000)):
     mailhog_instances = []
     smtp_ports = []
     api_ports = []
+    
+    # First check default ports
+    default_instance = check_default_mailhog_instance(host)
+    if default_instance:
+        return default_instance
     
     logging.info(f"Starting MailHog port scan on {host} (port range: {port_range[0]}-{port_range[1]})")
     print(f"{Fore.CYAN}Scanning for MailHog instances on {host}...{Style.RESET_ALL}")
@@ -164,12 +225,16 @@ def scan_mailhog_ports(host="localhost", port_range=(1024, 10000)):
             })
             print(f"{Fore.GREEN}  Found MailHog API (v{api_version}): {url}{api_path}{Style.RESET_ALL}")
             logging.info(f"Found MailHog API: {url}{api_path} (version: {api_version})")
+            
+            # Stop scanning after finding first API port if there are also SMTP ports found
+            if smtp_ports:
+                print(f"{Fore.GREEN}Found API port, stopping scan...{Style.RESET_ALL}")
+                logging.info("Found API port, stopping scan")
+                break
     
     # Match SMTP ports with API ports to identify complete MailHog instances
     for smtp_port in smtp_ports:
         for api_info in api_ports:
-            # MailHog typically uses SMTP port and API port that are related (e.g., 1025 and 8025)
-            # or they might be sequential, or the Web UI port might be on a standard port (80, 8080, etc.)
             mailhog_instances.append({
                 "smtp_port": smtp_port,
                 "api_port": api_info["port"],
@@ -297,6 +362,8 @@ def main():
                         help='Port range to scan (default: 1024 10000)')
     parser.add_argument('--host', type=str, default='localhost',
                         help='Host to scan (default: localhost)')
+    parser.add_argument('--skip-default-check', action='store_true',
+                        help='Skip checking default MailHog ports')
     
     args = parser.parse_args()
     port_range = tuple(args.port_range)
@@ -358,7 +425,7 @@ def main():
         for test in api_tests:
             status = "✅ Working" if test["working"] else "❌ Not working"
             print(f"  {test['endpoint']}: {status} ({test['url']})")
-            logging.info(f"  API endpoint {test['endpoint']}: {'Working' if test['working'] else 'Not working'} ({test['status_code']})")
+            logging.info(f"  API endpoint {test['endpoint']}: {'Working' if test["working"] else 'Not working'} ({test['status_code']})")
     
     # Log completion
     logging.info(f"MailHog scan completed at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
