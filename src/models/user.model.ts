@@ -6,7 +6,8 @@ import bcrypt from 'bcrypt';
 export enum UserRole {
   ADMIN = 'admin',
   SUPERVISOR = 'supervisor',
-  ENDUSER = 'enduser'
+  ENDUSER = 'enduser',
+  USER = 'enduser'  // Add USER as an alias for ENDUSER
 }
 
 // Defines the structure of a user document in the database

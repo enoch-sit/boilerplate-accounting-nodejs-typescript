@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Main application service for production
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auth-service-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongodb:27017/auth_db
+      # These secrets should be injected via environment variables or a secure vault in real production
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - PASSWORD_RESET_EXPIRES_IN=1h
+      - VERIFICATION_CODE_EXPIRES_IN=15m
+      - FRONTEND_URL=${FRONTEND_URL}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - PORT=3000
+      - LOG_LEVEL=info
+    depends_on:
+      - mongodb
+    networks:
+      - auth-network-prod
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # MongoDB service for production
+  mongodb:
+    image: mongo:6.0
+    container_name: auth-mongodb-prod
+    volumes:
+      - mongodb-prod-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=auth_db
+    networks:
+      - auth-network-prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "${MONGO_INITDB_ROOT_USERNAME}", "-p", "${MONGO_INITDB_ROOT_PASSWORD}", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  auth-network-prod:
+    driver: bridge
+
+volumes:
+  mongodb-prod-data:

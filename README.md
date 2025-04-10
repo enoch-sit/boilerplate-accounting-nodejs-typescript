@@ -42,6 +42,7 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 | Endpoint                       | Method | Description                           | Access Level      |
 |--------------------------------|--------|---------------------------------------|-------------------|
 | `/api/admin/users`             | GET    | Get all users                         | Admin             |
+| `/api/admin/users`             | POST   | Create a new user                     | Admin             |
 | `/api/admin/users/:userId/role`| PUT    | Update user role                      | Admin             |
 | `/api/admin/reports`           | GET    | Access reports                        | Admin/Supervisor  |
 | `/api/admin/dashboard`         | GET    | Access dashboard                      | Any Authenticated |
@@ -398,10 +399,19 @@ By using these testing tools and strategies, you can thoroughly validate your au
 | `MONGO_URI`             | MongoDB connection string            | `mongodb://localhost:27017/auth` |
 | `JWT_ACCESS_SECRET`     | Secret key for access tokens         | `your_access_secret`      |
 | `JWT_REFRESH_SECRET`    | Secret key for refresh tokens        | `your_refresh_secret`     |
+| `JWT_ACCESS_EXPIRES_IN` | Access token expiration time         | `15m`                     |
+| `JWT_REFRESH_EXPIRES_IN`| Refresh token expiration time        | `7d`                      |
 | `EMAIL_HOST`            | SMTP server host                     | `smtp.mailservice.com`    |
 | `EMAIL_PORT`            | SMTP server port                     | `587`                     |
 | `EMAIL_USER`            | SMTP username                        | `user@example.com`        |
-| `EMAIL_PASS`            | SMTP password                        | `password123`            |
+| `EMAIL_PASS`            | SMTP password                        | `password123`             |
+| `EMAIL_FROM`            | From address for emails              | `noreply@example.com`     |
+| `PASSWORD_RESET_EXPIRES_IN` | Password reset token expiration  | `1h`                      |
+| `VERIFICATION_CODE_EXPIRES_IN` | Email verification expiration | `15m`                     |
+| `CORS_ORIGIN`           | CORS allowed origins                 | `https://example.com`     |
+| `PORT`                  | Server port                          | `3000`                    |
+| `LOG_LEVEL`             | Logging level                        | `info`                    |
+| `FRONTEND_URL`          | Frontend application URL             | `https://example.com`     |
 
 ### Email Setup
 
@@ -427,7 +437,7 @@ By using these testing tools and strategies, you can thoroughly validate your au
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json ./`
 RUN npm install
 COPY . .
 RUN npm run build
@@ -639,4 +649,3 @@ For detailed instructions and troubleshooting, see [Test.md](./tests/Test.md).
 # Run API tests with email verification bypass
 .\tests\auto-verify-tests.ps1
 ```
-````

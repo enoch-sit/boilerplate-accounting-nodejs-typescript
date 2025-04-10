@@ -1,29 +1,16 @@
 FROM node:18-alpine
 
-# Install packages needed for development and building native modules
-RUN apk add --no-cache git python3 make g++
-
-# Create app directory
 WORKDIR /app
 
-# Install app dependencies
+# Install dependencies first (for better caching)
 COPY package*.json ./
-
-# Install ALL dependencies (including devDependencies)
 RUN npm install
 
-# Bundle app source
+# Copy the rest of the application code
 COPY . .
 
-# Rebuild bcrypt for Alpine
-RUN npm rebuild bcrypt --build-from-source
-
-# Set environment variables for testing
-ENV NODE_ENV=development
-ENV PORT=3000
-
-# Expose port
+# Expose the port the app runs on
 EXPOSE 3000
 
-# Command to run tests
-CMD ["npm", "test"]
+# Start the development server using ts-node-dev for hot reloading
+CMD ["npm", "run", "dev"]

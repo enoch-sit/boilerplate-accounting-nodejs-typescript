@@ -347,6 +347,84 @@ export class AuthService {
       return false;
     }
   }
+
+  /**
+   * Create a new user as an administrator with specified role.
+   * 
+   * @param username - The desired username for the new user.
+   * @param email - The email address of the new user.
+   * @param password - The password for the new user (will be hashed before storage).
+   * @param role - The role to assign to the new user.
+   * @param skipVerification - Whether to mark the user as verified immediately (optional).
+   * @returns A Promise that resolves to a SignupResult object indicating the success or failure of the user creation.
+   */
+  async adminCreateUser(
+    username: string, 
+    email: string, 
+    password: string, 
+    role: UserRole = UserRole.USER,
+    skipVerification: boolean = false
+  ): Promise<SignupResult> {
+    try {
+      // Check if the provided username already exists in the database
+      const existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        return { success: false, message: 'Username already exists' };
+      }
+
+      // Check if the provided email already exists in the database
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) {
+        return { success: false, message: 'Email already exists' };
+      }
+
+      // Create a new user document in the database with the specified role
+      const user = await User.create({
+        username,
+        email,
+        password, // Password will be hashed by the pre-save hook in the User model
+        role,
+        isVerified: skipVerification // Optionally mark the user as verified immediately
+      });
+
+      if (!skipVerification) {
+        // Generate a random 3-character verification token
+        const token = crypto.randomBytes(3).toString('hex').toUpperCase();
+        
+        // Set the expiration time for the verification token
+        const expiresIn = process.env.VERIFICATION_CODE_EXPIRES_IN || '15m';
+        const expiresInMs = expiresIn.endsWith('h')
+          ? parseInt(expiresIn) * 60 * 60 * 1000
+          : parseInt(expiresIn) * 60 * 1000;
+
+        // Save the verification token in the database
+        await Verification.create({
+          userId: user._id,
+          type: VerificationType.EMAIL,
+          token,
+          expires: new Date(Date.now() + expiresInMs)
+        });
+
+        // Send a verification email to the user with the generated token
+        await emailService.sendVerificationEmail(email, username, token);
+      }
+
+      // Log the successful user creation by admin
+      logger.info(`User created by admin: ${username}, role: ${role}, verified: ${skipVerification}`);
+      
+      return {
+        success: true,
+        userId: user._id.toString(),
+        message: skipVerification 
+          ? 'User created successfully and is ready to use the system.'
+          : 'User created successfully. Verification email has been sent.'
+      };
+    } catch (error) {
+      // Log any errors that occur during the admin user creation process
+      logger.error('Admin create user error:', error);
+      return { success: false, message: 'User creation failed' };
+    }
+  }
 }
 
 export const authService = new AuthService();

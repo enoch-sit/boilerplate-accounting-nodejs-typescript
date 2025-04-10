@@ -1,27 +1,41 @@
-FROM node:18-alpine
+# Build stage
+FROM node:18-alpine AS builder
 
-# Create app directory
 WORKDIR /app
 
-# Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-COPY package*.json ./
-
 # Install dependencies
-RUN npm ci --only=production
+COPY package*.json ./
+RUN npm ci
 
-# Bundle app source
+# Copy source code
 COPY . .
 
-# Build TypeScript code
+# Build the application
 RUN npm run build
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
+# Production stage
+FROM node:18-alpine
 
-# Expose port
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Copy built app from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Set runtime environment to production
+ENV NODE_ENV=production
+
+# Expose the application port
 EXPOSE 3000
 
-# Run the application
+# Run as non-root user for improved security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Start the application
 CMD ["node", "dist/app.js"]

@@ -1,6 +1,81 @@
 # Technical Documentation: TypeScript Authentication System
 
-This document provides a comprehensive technical overview of the TypeScript Authentication System, including database structure, API architecture, authentication workflows, and testing methodologies.
+This document provides a comprehensive technical overview of the TypeScript Authentication System. It includes background knowledge for those unfamiliar with Node.js, MongoDB, and Express.js; essential short examples; database structure; API architecture; authentication workflows; testing methodologies; security considerations; role-based access control; admin APIs; and more.
+
+## Introduction to Key Technologies
+
+To fully understand this authentication system's architecture and implementation, familiarity with key technologies used is beneficial. This section provides a brief overview of Node.js, Express.js (often referred to as Express), and MongoDB.
+
+### Node.js
+
+Node.js is a JavaScript runtime built on Chrome's V8 JavaScript engine. It allows developers to run JavaScript on the server-side. Node.js is known for its event-driven architecture and non-blocking I/O model.
+
+**Example: Creating a simple HTTP server**
+
+```javascript
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end('Hello World\n');
+});
+
+server.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+```
+
+### Express.js
+
+Express.js is a minimal and flexible Node.js web application framework that provides features for web and mobile applications. It simplifies building APIs and web servers by handling routing and middleware.
+
+**Example: Setting up a basic Express server**
+
+```javascript
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+app.listen(port, () => {
+  console.log(`Example app listening at [invalid url, do not cite]);
+});
+```
+
+### MongoDB
+
+MongoDB is a NoSQL database that stores data in flexible documents. It’s designed for scalability and flexibility. Unlike relational databases (e.g., MySQL), MongoDB does not require a fixed schema.
+
+**Example: Connecting to MongoDB and inserting a document**
+
+```javascript
+const { MongoClient } = require('mongodb');
+
+async function connect() {
+  const uri = "mongodb://localhost:27017";
+  const client = new MongoClient(uri);
+
+  try {
+    await client.connect();
+    await client.db("mydatabase").collection("mycollection").insertOne({ name: "John Doe", age: 30 });
+    console.log("Document inserted");
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await client.close();
+  }
+}
+
+connect();
+```
+
+These technologies form the foundation of this authentication system.
+
+---
 
 ## Table of Contents
 
@@ -10,8 +85,11 @@ This document provides a comprehensive technical overview of the TypeScript Auth
 4. [Authentication Workflows](#authentication-workflows)
 5. [API Usage Steps](#api-usage-steps)
 6. [Role-Based Access Control](#role-based-access-control)
-7. [Testing Scope](#testing-scope)
-8. [Security Considerations](#security-considerations)
+7. [Admin API for User Management](#admin-api-for-user-management)
+8. [Testing Scope](#testing-scope)
+9. [Security Considerations](#security-considerations)
+
+---
 
 ## System Architecture
 
@@ -44,6 +122,8 @@ graph TB
     class DB data
     class Email service
 ```
+
+---
 
 ## Database Structure
 
@@ -106,9 +186,12 @@ erDiagram
 - TTL index automatically removes expired verifications
 - References user by userId
 
+---
+
 ## API Structure
 
-The API is organized into route modules, middleware, and services:
+The API is organized into route modules using Express.js. Routes define endpoints that clients can interact with,
+while middleware functions handle tasks such as authentication and error handling.
 
 ```mermaid
 graph TB
@@ -222,6 +305,8 @@ graph TB
 |--------------------------------|--------|---------------------------------------|-------------------|
 | `/health`                      | GET    | Health check endpoint                 | Public            |
 
+---
+
 ## Authentication Workflows
 
 The system implements several authentication workflows:
@@ -252,6 +337,23 @@ sequenceDiagram
     Auth->>DB: Delete verification record
     Auth->>API: Return success
     API->>User: 200 OK (Email verified)
+```
+
+**Implementation Example:**
+
+```javascript
+// Pseudo-code for illustration
+app.post('/auth/signup', async (req, res) => {
+    const { username, email, password } = req.body;
+    // Validate input
+    // Check if user exists
+    // Hash password
+    // Create user
+    // Generate verification token
+    // Save verification record
+    // Send verification email
+    // Return success response
+});
 ```
 
 ### Login and Token Refresh
@@ -285,6 +387,29 @@ sequenceDiagram
     API->>User: 200 OK (accessToken)
 ```
 
+**Implementation Example:**
+
+```javascript
+// Pseudo-code for illustration
+app.post('/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    // Find user
+    // Verify password
+    // Generate access token
+    // Generate refresh token
+    // Store refresh token
+    // Return tokens
+});
+
+app.post('/auth/refresh', async (req, res) => {
+    const { refreshToken } = req.body;
+    // Verify refresh token
+    // Check token validity
+    // Generate new access token
+    // Return new access token
+});
+```
+
 ### Password Reset Flow
 
 ```mermaid
@@ -312,6 +437,31 @@ sequenceDiagram
     Password->>API: Return success
     API->>User: 200 OK
 ```
+
+**Implementation Example:**
+
+```javascript
+// Pseudo-code for illustration
+app.post('/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    // Find user
+    // Generate reset token
+    // Create reset token record
+    // Send reset email
+    // Return success
+});
+
+app.post('/auth/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    // Find reset token
+    // Verify token
+    // Update user password
+    // Delete reset token
+    // Return success
+});
+```
+
+---
 
 ## API Usage Steps
 
@@ -344,6 +494,8 @@ graph TD
     B -->|2. New access token| A
     A -->|3. Update stored token| C
 ```
+
+---
 
 ## Role-Based Access Control
 
@@ -391,105 +543,25 @@ graph TD
    - Cannot access administrative or supervisory functions
    - Default role assigned to all new users
 
-### Route Access Patterns
-
-The route access patterns demonstrate which roles can access which API endpoints:
-
-```mermaid
-graph TD
-    subgraph "Admin Access"
-        AdminUser[Admin User]
-        AdminEndpoints[Admin-only Endpoints]
-        
-        AdminUser -->|Can access| AdminEndpoints
-        
-        subgraph "Admin-Only Routes"
-            AR1[GET /api/admin/users]
-            AR2[PUT /api/admin/users/:id/role]
-        end
-        
-        AdminEndpoints --> AR1
-        AdminEndpoints --> AR2
-    end
-    
-    classDef adminRole fill:#E53935,stroke:#C62828,color:white;
-    class AdminUser,AdminEndpoints,AR1,AR2 adminRole
-```
-
-```mermaid
-graph TD
-    subgraph "Supervisor Access"
-        SupervisorUser[Supervisor User]
-        AdminUser[Admin User]
-        SupervisorEndpoints[Supervisor Endpoints]
-        
-        SupervisorUser -->|Can access| SupervisorEndpoints
-        AdminUser -->|Can also access| SupervisorEndpoints
-        
-        subgraph "Supervisor Routes"
-            SR1[GET /api/admin/reports]
-        end
-        
-        SupervisorEndpoints --> SR1
-    end
-    
-    classDef adminRole fill:#E53935,stroke:#C62828,color:white;
-    classDef supervisorRole fill:#FB8C00,stroke:#EF6C00,color:white;
-    
-    class AdminUser adminRole
-    class SupervisorUser,SupervisorEndpoints,SR1 supervisorRole
-```
-
-```mermaid
-graph TD
-    subgraph "End User Access"
-        EndUser[End User]
-        SupervisorUser[Supervisor User]
-        AdminUser[Admin User]
-        UserEndpoints[User Endpoints]
-        
-        EndUser -->|Can access| UserEndpoints
-        SupervisorUser -->|Can also access| UserEndpoints
-        AdminUser -->|Can also access| UserEndpoints
-        
-        subgraph "User Routes"
-            UR1[GET /api/admin/dashboard]
-            UR2[GET /api/profile]
-            UR3[PUT /api/profile]
-            UR4[POST /api/change-password]
-        end
-        
-        UserEndpoints --> UR1
-        UserEndpoints --> UR2
-        UserEndpoints --> UR3
-        UserEndpoints --> UR4
-    end
-    
-    classDef adminRole fill:#E53935,stroke:#C62828,color:white;
-    classDef supervisorRole fill:#FB8C00,stroke:#EF6C00,color:white;
-    classDef userRole fill:#43A047,stroke:#2E7D32,color:white;
-    
-    class AdminUser adminRole
-    class SupervisorUser supervisorRole
-    class EndUser,UserEndpoints,UR1,UR2,UR3,UR4 userRole
-```
-
-### RBAC Implementation
+### Access Control Implementation
 
 The role-based access control is implemented through middleware functions in the `auth.middleware.ts` file:
 
 1. **Authentication Middleware** (`authenticate`): 
    - Verifies JWT tokens for all protected routes
+   - Supports both header and cookie-based authentication
    - Attaches user information including role to the request object
    - Required for all protected endpoints
 
 2. **Admin Check Middleware** (`requireAdmin`):
    - Ensures the authenticated user has the Admin role
    - Returns 403 Forbidden if a non-admin attempts to access an admin-only route
+   - Used for user management and system configuration routes
 
 3. **Supervisor Check Middleware** (`requireSupervisor`):
    - Ensures the authenticated user has either Admin or Supervisor role
    - Returns 403 Forbidden if a regular user attempts to access a supervisor route
+   - Used for reporting and monitoring features
 
 This middleware-based approach allows for clean route definitions with appropriate access restrictions:
 
@@ -505,6 +577,66 @@ router.get('/profile', authenticate, userController.getProfile);
 ```
 
 By enforcing role-based access at the route level through middleware, the system ensures that unauthorized users cannot access restricted functionality, even if they possess a valid authentication token.
+
+---
+
+## Admin API for User Management
+
+The authentication system provides a comprehensive set of admin APIs for user management, enabling administrators to:
+
+- List all users in the system
+- Create new users with specific roles
+- Update user roles
+- Access role-specific functionality
+
+### User Creation by Administrators
+
+Administrators can create new users with predefined roles using a dedicated API endpoint:
+
+```
+POST /api/admin/users
+```
+
+**Request Body:**
+```json
+{
+  "username": "newuser",
+  "email": "newuser@example.com", 
+  "password": "securePassword123!",
+  "role": "supervisor",  // Optional, defaults to "user"
+  "skipVerification": true  // Optional, defaults to false
+}
+```
+
+**Features:**
+- **Role Assignment**: Create users with specific roles (user or supervisor)
+- **Verification Control**: Optionally skip the email verification process
+- **Security**: Only Admin users can access this API
+- **Validation**: Prevents creation of duplicate usernames/emails 
+- **Audit Logging**: All user creation actions are logged for audit purposes
+
+**Response:**
+```json
+{
+  "message": "User created successfully and is ready to use the system.",
+  "userId": "60d21b4667d0d8992e610c85"
+}
+```
+
+### Admin Role Protection
+
+For security reasons, regular administrators cannot create other admin users through this API. This prevents privilege escalation and maintains the security hierarchy.
+
+### Implementation Details
+
+The admin user creation API leverages the existing authentication framework with additional controls:
+- Validates all input fields
+- Enforces role-based restrictions
+- Provides detailed logs of all actions
+- Returns appropriate HTTP status codes and error messages
+- Integrates with the email verification system
+
+---
 
 ## Testing Scope
 
@@ -591,6 +723,8 @@ flowchart TD
     class TestType,MailhogCheck decision
     class Results endStyle
 ```
+
+---
 
 ## Security Considerations
 
