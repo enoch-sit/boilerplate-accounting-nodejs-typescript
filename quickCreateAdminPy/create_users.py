@@ -10,6 +10,7 @@ import subprocess
 import time
 import sys
 import os
+import datetime
 
 # Configuration
 API_BASE_URL = "http://localhost:3000"
@@ -47,6 +48,31 @@ REGULAR_USERS = [
         "role": "enduser",
     },
 ]
+
+# Log file setup
+LOG_FILE = "user_credentials.log"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_PATH = os.path.join(SCRIPT_DIR, LOG_FILE)
+
+
+def log_user_creation(user_type, username, email, password, user_id=None):
+    """Log user creation details to file"""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] Created {user_type}: username='{username}', email='{email}', password='{password}'"
+    if user_id:
+        log_entry += f", id='{user_id}'"
+
+    with open(LOG_PATH, "a") as log_file:
+        log_file.write(log_entry + "\n")
+
+    # Don't print passwords to console for security
+    console_entry = (
+        f"[{timestamp}] Created {user_type}: username='{username}', email='{email}'"
+    )
+    if user_id:
+        console_entry += f", id='{user_id}'"
+
+    print(f"✓ Log entry created: {console_entry}")
 
 
 def run_command(command):
@@ -93,11 +119,26 @@ def create_admin_user():
             data = response.json()
             user_id = data.get("userId")
             print(f"✅ Admin user created with ID: {user_id}")
+            # Log the admin user creation
+            log_user_creation(
+                "Admin",
+                ADMIN_USER["username"],
+                ADMIN_USER["email"],
+                ADMIN_USER["password"],
+                user_id,
+            )
             return user_id
         else:
             print(f"❌ Failed to create admin user: {response.text}")
             if response.status_code == 400 and "already exists" in response.text:
                 print("ℹ️ Admin user might already exist, continuing...")
+                # Log attempt with note that user might already exist
+                log_user_creation(
+                    "Admin (possible existing)",
+                    ADMIN_USER["username"],
+                    ADMIN_USER["email"],
+                    ADMIN_USER["password"],
+                )
                 return "existing"
     except requests.RequestException as e:
         print(f"❌ Request error: {e}")
@@ -133,6 +174,12 @@ exit
         or 'modifiedCount" : 1' in output
     ):
         print("✅ User promoted to admin role successfully")
+        # Log the promotion
+        with open(LOG_PATH, "a") as log_file:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_file.write(
+                f"[{timestamp}] Promoted '{ADMIN_USER['username']}' to admin role\n"
+            )
         return True
     else:
         print("❌ Failed to promote user to admin role")
@@ -174,6 +221,12 @@ def get_admin_token():
 
             if token:
                 print("✅ Admin access token obtained")
+                # Log successful login
+                with open(LOG_PATH, "a") as log_file:
+                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    log_file.write(
+                        f"[{timestamp}] Admin '{ADMIN_USER['username']}' logged in successfully\n"
+                    )
                 return token
             else:
                 print("❌ Access token not found in response")
@@ -213,6 +266,14 @@ def create_user(user_data, token, role_name):
             data = response.json()
             user_id = data.get("userId")
             print(f"✅ {role_name} created: {user_data['username']} (ID: {user_id})")
+            # Log the user creation
+            log_user_creation(
+                role_name,
+                user_data["username"],
+                user_data["email"],
+                user_data["password"],
+                user_id,
+            )
             return user_id
         else:
             print(
@@ -225,6 +286,15 @@ def create_user(user_data, token, role_name):
 
 
 def main():
+    # Create log file header if it doesn't exist or is empty
+    if not os.path.exists(LOG_PATH) or os.path.getsize(LOG_PATH) == 0:
+        with open(LOG_PATH, "w") as log_file:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_file.write(f"# User Creation Log - Started {timestamp}\n")
+            log_file.write(
+                "# Format: [timestamp] Created user_type: username='xxx', email='xxx', password='xxx'\n\n"
+            )
+
     # Check if API server is running
     if not check_api_health():
         sys.exit(1)
@@ -254,6 +324,7 @@ def main():
         create_user(user, admin_token, "Regular user")
 
     print("\n✨ User setup completed successfully!")
+    print(f"\nCredential log saved to: {LOG_PATH}")
     print("\nCreated accounts:")
     print(f"- Admin: {ADMIN_USER['username']} / {ADMIN_USER['password']}")
     for supervisor in SUPERVISOR_USERS:
