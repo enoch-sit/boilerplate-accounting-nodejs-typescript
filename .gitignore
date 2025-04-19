@@ -42,3 +42,9 @@ coverage/
 *.swp
 
 test-results/*
+
+# Ignore all files in the test-results directory
+test-results/**
+
+# Python virtual environment
+venv/
