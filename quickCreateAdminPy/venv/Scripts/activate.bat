@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\thank\Documents\thankGodForJesusChrist\thankGodForGift\tool-auth\boilerplate-accounting-nodejs-typescript\quickCreateAdminPy\venv
+set VIRTUAL_ENV=C:\Users\user\Documents\ThankGodForJesusChrist\ThankGodForTools\typescript_auth_simple\simple-accounting\quickCreateAdminPy\venv
 
 if not defined PROMPT set PROMPT=$P$G
 

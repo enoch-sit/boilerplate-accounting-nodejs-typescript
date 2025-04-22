@@ -48,3 +48,5 @@ test-results/**
 
 # Python virtual environment
 venv/**
+
+venv/
