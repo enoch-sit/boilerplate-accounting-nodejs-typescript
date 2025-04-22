@@ -543,6 +543,12 @@ graph TD
    - Cannot access administrative or supervisory functions
    - Default role assigned to all new users
 
+4. **User Role (`UserRole.USER`)**: 
+   - Alias for `UserRole.ENDUSER`
+   - Functionally identical to the End User role
+   - Provides compatibility with systems that expect "user" as a role name
+   - Can be used interchangeably with ENDUSER in API calls
+
 ### Access Control Implementation
 
 The role-based access control is implemented through middleware functions in the `auth.middleware.ts` file:

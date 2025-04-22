@@ -75,11 +75,12 @@ export interface TokenPayload {
 
 ### Current Roles
 
-The system includes three default roles:
+The system includes the following default roles:
 
-- `USER`: Regular user with standard permissions
-- `SUPERVISOR`: Middle-level role with additional permissions
 - `ADMIN`: Highest role with full system access
+- `SUPERVISOR`: Middle-level role with additional permissions
+- `ENDUSER`: Regular user with standard permissions
+- `USER`: Alias for ENDUSER, also representing regular users with standard permissions
 
 ## Adding New Roles for Accounting Functionality
 

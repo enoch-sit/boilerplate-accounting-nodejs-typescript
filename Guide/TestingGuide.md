@@ -496,11 +496,12 @@ If the admin test fails with `[FAIL] Admin Login`, it's typically because:
 
 ### Testing Role-Based Access Control
 
-The system has three roles with a hierarchical permission structure:
+The system has four roles with a hierarchical permission structure:
 
 1. `admin`: Full system access
 2. `supervisor`: Limited administrative features
-3. `enduser` (or `user`): Basic functionality only
+3. `enduser`: Basic functionality only
+4. `user`: Alias for `enduser`, providing the same basic functionality
 
 To test this hierarchy:
 
@@ -520,7 +521,7 @@ The role-based system works through:
      ADMIN = 'admin',
      SUPERVISOR = 'supervisor',
      ENDUSER = 'enduser',
-     USER = 'enduser'  // USER is an alias for ENDUSER
+     USER = 'user'  // USER is an alias for ENDUSER
    }
    ```
 
@@ -897,5 +898,3 @@ if __name__ == "__main__":
 ```
 
 ## Troubleshooting Common Test Failures
-
-// ...existing code...
