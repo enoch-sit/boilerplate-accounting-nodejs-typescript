@@ -68,8 +68,10 @@ The authentication system currently uses JSON Web Tokens (JWT) with the followin
 export interface TokenPayload {
   sub: string;          // User ID
   username: string;     // Username
+  email: string;        // Email (for identification across services)
   type: 'access' | 'refresh'; // Token type
   role: UserRole;       // User role (ADMIN, SUPERVISOR, USER)
+  // No accounting-specific information in the token
 }
 ```
 

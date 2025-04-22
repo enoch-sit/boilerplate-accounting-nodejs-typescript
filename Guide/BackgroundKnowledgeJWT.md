@@ -51,6 +51,28 @@ Example JWT:
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
 ```
 
+#### JWT Payload Structure for Simple Accounting
+
+For our Simple Accounting system, we use the following JWT payload structure:
+
+```javascript
+{
+  "sub": "123456",           // User ID
+  "username": "johndoe",     // Username
+  "email": "john@example.com", // Email (for identification across services)
+  "type": "access",          // Token type: "access" or "refresh"
+  "role": "user",            // User role (ADMIN, SUPERVISOR, USER)
+  "iat": 1650000000,         // Issued at timestamp
+  "exp": 1650001800          // Expiration timestamp
+}
+```
+
+This structure ensures:
+1. **Unique identification**: Using sub (user ID), username, and email
+2. **Role-based access control**: Through the role field
+3. **Token lifecycle management**: Through token type and expiration claims
+4. **Cross-service compatibility**: Using email for identification across different services
+
 ## JWT Flow Sequence
 
 ```mermaid

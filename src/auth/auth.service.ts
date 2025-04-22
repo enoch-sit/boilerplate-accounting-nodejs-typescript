@@ -247,6 +247,7 @@ export class AuthService {
       const accessToken = tokenService.generateAccessToken(
         user._id.toString(),
         user.username,
+        user.email,
         user.role
       );
       
@@ -254,6 +255,7 @@ export class AuthService {
       const refreshToken = await tokenService.generateRefreshToken(
         user._id.toString(),
         user.username,
+        user.email,
         user.role
       );
 
@@ -299,6 +301,7 @@ export class AuthService {
       const accessToken = tokenService.generateAccessToken(
         decoded.sub,
         decoded.username,
+        decoded.email,
         decoded.role
       );
       
