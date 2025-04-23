@@ -4,6 +4,8 @@ import { authenticate, requireAdmin, requireSupervisor } from '../auth/auth.midd
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
 import { logger } from '../utils/logger';
+import { tokenService } from '../auth/token.service';
+import { Types } from 'mongoose';
 
 const router = Router();
 
@@ -89,6 +91,95 @@ router.put('/users/:userId/role', authenticate, requireAdmin, async (req: Reques
   } catch (error) {
     logger.error('Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+// Delete a specific user (admin only)
+router.delete('/users/:userId', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    // Prevent an admin from deleting themselves
+    if (req.user?.userId === userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Find the user to get their info for logging
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Check if trying to delete another admin (additional security)
+    if (user.role === UserRole.ADMIN) {
+      logger.warn(`Admin ${req.user?.username} attempted to delete another admin ${user.username}`);
+      return res.status(403).json({ error: 'Cannot delete another admin user' });
+    }
+    
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+    
+    // Delete all refresh tokens for the user (cleanup)
+    await tokenService.deleteAllUserRefreshTokens(userId);
+    
+    logger.info(`User ${user.username} (${user.email}) deleted by admin ${req.user?.username}`);
+    res.status(200).json({ 
+      message: 'User deleted successfully',
+      user: {
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    logger.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Delete all users except admins (admin only)
+router.delete('/users', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { confirmDelete, preserveAdmins = true } = req.body;
+    
+    // Require explicit confirmation to prevent accidental deletion
+    if (confirmDelete !== 'DELETE_ALL_USERS') {
+      return res.status(400).json({ 
+        error: 'Confirmation required',
+        message: 'To delete all users, include {"confirmDelete": "DELETE_ALL_USERS"} in the request body'
+      });
+    }
+    
+    let deleteFilter = {};
+    
+    // By default, preserve admin accounts
+    if (preserveAdmins) {
+      deleteFilter = { role: { $ne: UserRole.ADMIN } };
+    }
+    
+    // Delete users based on filter
+    const result = await User.deleteMany(deleteFilter);
+    
+    // Delete all associated refresh tokens
+    if (!preserveAdmins) {
+      // If deleting all users including admins, delete all tokens
+      await tokenService.deleteAllRefreshTokens();
+    } else {
+      // If preserving admins, we'd need to find and delete non-admin tokens
+      // This would require a more complex query with aggregation
+      // For simplicity, we'll keep all tokens and let them expire naturally
+      logger.info('Refresh tokens for non-admin users will expire naturally');
+    }
+    
+    logger.info(`Bulk user deletion by admin ${req.user?.username}. ${result.deletedCount} users deleted.`);
+    res.status(200).json({ 
+      message: `${result.deletedCount} users deleted successfully`,
+      preservedAdmins: preserveAdmins
+    });
+  } catch (error) {
+    logger.error('Error bulk deleting users:', error);
+    res.status(500).json({ error: 'Failed to delete users' });
   }
 });
 

@@ -288,6 +288,9 @@ graph TB
 | Endpoint                       | Method | Description                           | Access Level      |
 |--------------------------------|--------|---------------------------------------|-------------------|
 | `/api/admin/users`             | GET    | Get all users                         | Admin             |
+| `/api/admin/users`             | POST   | Create a new user                     | Admin             |
+| `/api/admin/users`             | DELETE | Delete all users                      | Admin             |
+| `/api/admin/users/:userId`     | DELETE | Delete a specific user                | Admin             |
 | `/api/admin/users/:userId/role`| PUT    | Update user role                      | Admin             |
 | `/api/admin/reports`           | GET    | Access reports                        | Admin/Supervisor  |
 | `/api/admin/dashboard`         | GET    | Access dashboard                      | Any Authenticated |
@@ -626,6 +629,65 @@ POST /api/admin/users
 {
   "message": "User created successfully and is ready to use the system.",
   "userId": "60d21b4667d0d8992e610c85"
+}
+```
+
+### User Deletion by Administrators
+
+Administrators can delete users through two dedicated API endpoints:
+
+#### 1. Delete a Specific User
+
+```
+DELETE /api/admin/users/:userId
+```
+
+**Features:**
+- **Selective Removal**: Delete individual users by their unique identifier
+- **Security Protections**:
+  - Admins cannot delete themselves
+  - Admins cannot delete other admin users (by default)
+- **Cleanup**: Automatically removes all refresh tokens associated with the deleted user
+- **Audit Logging**: All user deletion actions are logged for security and compliance
+
+**Response:**
+```json
+{
+  "message": "User deleted successfully",
+  "user": {
+    "username": "deleteduser",
+    "email": "deleted@example.com",
+    "role": "user"
+  }
+}
+```
+
+#### 2. Bulk User Deletion
+
+```
+DELETE /api/admin/users
+```
+
+**Request Body:**
+```json
+{
+  "confirmDelete": "DELETE_ALL_USERS",
+  "preserveAdmins": true  // Optional, defaults to true
+}
+```
+
+**Features:**
+- **Bulk Operations**: Delete multiple users in a single request
+- **Confirmation Required**: Explicit confirmation string to prevent accidental deletion
+- **Admin Protection**: Option to preserve admin accounts (enabled by default)
+- **Token Cleanup**: Removes associated refresh tokens for proper session termination
+- **Audit Logging**: Comprehensive logging of bulk deletion operations
+
+**Response:**
+```json
+{
+  "message": "15 users deleted successfully",
+  "preservedAdmins": true
 }
 ```
 

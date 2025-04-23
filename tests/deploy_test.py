@@ -389,45 +389,18 @@ class AuthApiTester:
             return False
             
         try:
-            # Make sure we're using the correct endpoint
-            endpoint = f"{self.base_url}/api/auth/refresh"
-            print(f"DEBUG: Sending refresh token request to: {endpoint}")
-            print(f"DEBUG: Using refresh token: {self.refresh_token[:20]}...")
-            
-            # Add detailed debugging information
-            import json
-            debug_request_data = {"refreshToken": self.refresh_token}
-            print(f"DEBUG: Full request body: {json.dumps(debug_request_data)}")
-            
-            # Make sure headers are correct
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-            print(f"DEBUG: Request headers: {headers}")
-            
             response = self.session.post(
-                endpoint,
-                json=debug_request_data,
-                headers=headers
+                f"{self.base_url}/api/auth/refresh",
+                json={"refreshToken": self.refresh_token}
             )
-            
-            print(f"DEBUG: Response status code: {response.status_code}")
-            print(f"DEBUG: Response body: {response.text}")
             
             if response.status_code == 200:
                 response_data = response.json()
                 old_token = self.access_token
                 self.access_token = response_data.get("accessToken")
                 
-                # Check if we got a new access token
-                if self.access_token:
-                    passed = True
-                    details = f"New access token received: {self.access_token[:15]}..."
-                    print(f"DEBUG: Successfully refreshed token. Old: {old_token[:10]}... New: {self.access_token[:10]}...")
-                else:
-                    passed = False
-                    details = "Response was 200 but no accessToken in the response body"
+                passed = self.access_token is not None
+                details = f"New access token received: {self.access_token[:15]}..." if passed else "Missing accessToken in response"
             else:
                 passed = False
                 details = f"Status code: {response.status_code}, Response: {response.text}"
@@ -435,9 +408,6 @@ class AuthApiTester:
             self.log_result("Refresh Token", passed, details)
             return passed
         except Exception as e:
-            print(f"DEBUG: Exception during token refresh: {str(e)}")
-            import traceback
-            print(f"DEBUG: Stack trace: {traceback.format_exc()}")
             self.log_result("Refresh Token", False, details=str(e))
             return False
 
@@ -531,6 +501,204 @@ class AuthApiTester:
             self.log_result("User Logout", False, details=str(e))
             return False
 
+    def admin_delete_user(self, user_id=None):
+        """Test deleting a user as admin."""
+        if not self.admin_token:
+            self.log_result("Admin Delete User", False, "No admin token available")
+            return False
+        
+        # If no user ID provided, create a test user to delete
+        created_user_id = None
+        if not user_id:
+            print("Creating a test user for deletion...")
+            new_user = self.generate_test_user()
+            
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/api/admin/users",
+                    headers={"Authorization": f"Bearer {self.admin_token}"},
+                    json={
+                        "username": new_user["username"],
+                        "email": new_user["email"],
+                        "password": new_user["password"],
+                        "role": "user",
+                        "skipVerification": True
+                    }
+                )
+                
+                if response.status_code in [200, 201]:
+                    response_data = response.json()
+                    created_user_id = response_data.get("userId") or response_data.get("id")
+                    if not created_user_id:
+                        self.log_result("Admin Delete User", False, "Failed to create test user for deletion")
+                        return False
+                    print(f"Created test user with ID: {created_user_id}")
+                else:
+                    self.log_result("Admin Delete User", False, f"Failed to create test user. Status: {response.status_code}")
+                    return False
+            except Exception as e:
+                self.log_result("Admin Delete User", False, f"Error creating test user: {str(e)}")
+                return False
+            
+            user_id = created_user_id
+        
+        # Delete the user
+        try:
+            response = self.session.delete(
+                f"{self.base_url}/api/admin/users/{user_id}",
+                headers={"Authorization": f"Bearer {self.admin_token}"}
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                details = f"Successfully deleted user with ID: {user_id}"
+                try:
+                    response_data = response.json()
+                    if "user" in response_data:
+                        user_info = response_data["user"]
+                        details += f", Username: {user_info.get('username')}, Email: {user_info.get('email')}"
+                except:
+                    pass
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Admin Delete User", passed, details)
+            
+            # Verify the user was actually deleted by listing users
+            if passed:
+                self.verify_user_deleted(user_id)
+            
+            return passed
+        except Exception as e:
+            self.log_result("Admin Delete User", False, details=str(e))
+            return False
+
+    def verify_user_deleted(self, user_id):
+        """Verify that a user was successfully deleted."""
+        if not self.admin_token:
+            return
+            
+        try:
+            response = self.session.get(
+                f"{self.base_url}/api/admin/users",
+                headers={"Authorization": f"Bearer {self.admin_token}"}
+            )
+            
+            if response.status_code == 200:
+                users = response.json().get("users", [])
+                # Check if the deleted user still exists
+                for user in users:
+                    if user.get("_id") == user_id:
+                        print(f"WARNING: User {user_id} still exists after deletion attempt")
+                        return False
+                print(f"Verified: User {user_id} no longer exists")
+                return True
+        except:
+            print("Could not verify user deletion status")
+        return False
+
+    def admin_bulk_delete_users(self):
+        """Test bulk deletion of users as admin."""
+        if not self.admin_token:
+            self.log_result("Admin Bulk Delete Users", False, "No admin token available")
+            return False
+        
+        # Create a few test users for bulk deletion
+        print("Creating test users for bulk deletion...")
+        created_count = 0
+        for i in range(3):
+            new_user = self.generate_test_user()
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/api/admin/users",
+                    headers={"Authorization": f"Bearer {self.admin_token}"},
+                    json={
+                        "username": new_user["username"],
+                        "email": new_user["email"],
+                        "password": new_user["password"],
+                        "role": "user",
+                        "skipVerification": True
+                    }
+                )
+                if response.status_code in [200, 201]:
+                    created_count += 1
+            except:
+                pass
+        
+        if created_count == 0:
+            self.log_result("Admin Bulk Delete Users", False, "Failed to create any test users for bulk deletion")
+            return False
+            
+        print(f"Created {created_count} test users for bulk deletion")
+        
+        # Count users before deletion
+        users_before = 0
+        try:
+            response = self.session.get(
+                f"{self.base_url}/api/admin/users",
+                headers={"Authorization": f"Bearer {self.admin_token}"}
+            )
+            if response.status_code == 200:
+                users_before = len(response.json().get("users", []))
+                print(f"Users before bulk deletion: {users_before}")
+        except:
+            pass
+        
+        # Perform bulk deletion
+        try:
+            response = self.session.delete(
+                f"{self.base_url}/api/admin/users",
+                headers={
+                    "Authorization": f"Bearer {self.admin_token}",
+                    "Content-Type": "application/json"
+                },
+                json={"confirmDelete": "DELETE_ALL_USERS"}
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                details = "Successfully executed bulk user deletion"
+                try:
+                    response_data = response.json()
+                    if "message" in response_data:
+                        details = response_data["message"]
+                except:
+                    pass
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Admin Bulk Delete Users", passed, details)
+            
+            # Verify the users were actually deleted by counting remaining users
+            if passed:
+                try:
+                    response = self.session.get(
+                        f"{self.base_url}/api/admin/users",
+                        headers={"Authorization": f"Bearer {self.admin_token}"}
+                    )
+                    if response.status_code == 200:
+                        users_after = len(response.json().get("users", []))
+                        print(f"Users after bulk deletion: {users_after}")
+                        # Only admin users should remain
+                        non_admin_count = 0
+                        for user in response.json().get("users", []):
+                            if user.get("role") != "admin":
+                                non_admin_count += 1
+                        
+                        if non_admin_count > 0:
+                            print(f"WARNING: {non_admin_count} non-admin users still exist after bulk deletion")
+                        else:
+                            print("Verified: Only admin users remain after bulk deletion")
+                except Exception as e:
+                    print(f"Error verifying bulk deletion: {str(e)}")
+            
+            return passed
+        except Exception as e:
+            self.log_result("Admin Bulk Delete Users", False, details=str(e))
+            return False
+
     def run_admin_tests(self):
         """Run tests for admin user creation API."""
         print("\n" + "=" * 50)
@@ -544,6 +712,8 @@ class AuthApiTester:
         self.admin_create_user(role="user")
         self.admin_create_user(role="supervisor")
         self.list_users_as_admin()
+        self.admin_delete_user()
+        self.admin_bulk_delete_users()
         
         return True
 

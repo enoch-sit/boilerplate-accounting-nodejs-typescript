@@ -391,6 +391,71 @@ If an admin already exists, they can create other users (including admin users):
 
 **Note:** For security reasons, even admins cannot directly create other admin users through the API. This is an intentional security measure to prevent privilege escalation. Only direct database modification can create admin users.
 
+### Managing Users as an Admin
+
+Once you have admin access, you can manage users through the following operations:
+
+#### Creating New Users
+
+Admins can create new users with specific roles:
+
+```bash
+curl -X POST http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "email": "newuser@example.com",
+    "password": "Password123!",
+    "role": "enduser",
+    "skipVerification": true
+  }'
+```
+
+#### Updating User Roles
+
+Admins can change a user's role:
+
+```bash
+curl -X PUT http://localhost:3000/api/admin/users/USER_ID/role \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "supervisor"}'
+```
+
+#### Deleting a Single User
+
+Admins can delete specific users by their ID:
+
+```bash
+curl -X DELETE http://localhost:3000/api/admin/users/USER_ID \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Note: For security reasons, admins cannot delete themselves or other admin users.
+
+#### Bulk Deleting Users
+
+Admins can delete multiple users at once:
+
+```bash
+curl -X DELETE http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"confirmDelete": "DELETE_ALL_USERS", "preserveAdmins": true}'
+```
+
+This operation requires explicit confirmation with the exact string `DELETE_ALL_USERS` to prevent accidental deletion. By default, admin users are preserved (controlled by the optional `preserveAdmins` parameter, which defaults to `true`).
+
+#### Listing All Users
+
+Admins can view all users in the system:
+
+```bash
+curl -X GET http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
 ### Understanding Role Hierarchy
 
 The system implements a hierarchical role structure:

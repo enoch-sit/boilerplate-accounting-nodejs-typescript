@@ -11,9 +11,10 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
 5. [Real Email Verification Testing](#real-email-verification-testing)
 6. [Testing Admin User Creation API](#testing-admin-user-creation-api)
 7. [Testing Admin Authentication and Authorization](#testing-admin-authentication-and-authorization)
-8. [Architecture Compatibility Issues](#architecture-compatibility-issues)
-9. [Troubleshooting Common Issues](#troubleshooting-common-issues)
-10. [Understanding Deployment Test Reports](#understanding-deployment-test-reports)
+8. [Testing Admin User Deletion Functionality](#testing-admin-user-deletion-functionality)
+9. [Architecture Compatibility Issues](#architecture-compatibility-issues)
+10. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+11. [Understanding Deployment Test Reports](#understanding-deployment-test-reports)
 
 ## Development Testing in Docker
 
@@ -573,6 +574,230 @@ If you encounter issues with admin authentication during testing:
    Verify that the payload contains `"role": "admin"`.
 
 Remember that any change to the role system requires updates to the role enumeration, middleware, and potentially the database schema to ensure consistent behavior.
+
+## Testing Admin User Deletion Functionality
+
+The authentication system now includes endpoints for admin users to delete individual users or perform bulk user deletion. This section covers how to test these features to ensure they're working correctly.
+
+### Testing Individual User Deletion
+
+First, create some test users that you can delete:
+
+1. **Create Test Users to Delete**:
+   ```powershell
+   # Login as admin
+   $adminLoginResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/login' -Method Post -ContentType 'application/json' -Body '{"username":"admin","password":"AdminPassword123!"}'
+   
+   # Extract admin token
+   $adminToken = $adminLoginResponse.accessToken
+   
+   # Create users for deletion testing
+   $deleteTestUser = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Post -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   } -ContentType 'application/json' -Body '{
+       "username": "deletetest", 
+       "email": "deletetest@example.com", 
+       "password": "Password123!", 
+       "role": "user",
+       "skipVerification": true
+   }'
+   
+   # Store the user ID for deletion
+   $userIdToDelete = $deleteTestUser.userId
+   ```
+
+2. **Delete a Single User**:
+   ```powershell
+   # Delete the test user
+   $deleteResponse = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/users/$userIdToDelete" -Method Delete -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   }
+   
+   # Check the response
+   $deleteResponse
+   ```
+
+3. **Verify Deletion**:
+   ```powershell
+   # List all users to confirm deletion
+   $usersAfterDeletion = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   }
+   
+   # Check if the deleted user is gone
+   $deletedUserExists = $usersAfterDeletion.users | Where-Object { $_.username -eq "deletetest" }
+   
+   if ($deletedUserExists) {
+       Write-Host "ERROR: User still exists after deletion attempt"
+   } else {
+       Write-Host "SUCCESS: User was deleted successfully"
+   }
+   ```
+
+### Testing Security Restrictions
+
+The user deletion API includes important security restrictions that should be tested:
+
+1. **Attempt to Delete Self (Should Fail)**:
+   ```powershell
+   # Get admin's own user ID
+   $adminProfile = Invoke-RestMethod -Uri 'http://localhost:3000/api/protected/profile' -Method Get -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   }
+   $adminUserId = $adminProfile.user._id
+   
+   # Attempt to delete self (should fail)
+   try {
+       $selfDeleteResponse = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/users/$adminUserId" -Method Delete -Headers @{
+           "Authorization" = "Bearer $adminToken"
+       }
+       Write-Host "ERROR: Self-deletion should not be allowed"
+   } catch {
+       $statusCode = $_.Exception.Response.StatusCode.value__
+       Write-Host "Expected error occurred: Cannot delete self (Status code: $statusCode)"
+   }
+   ```
+
+2. **Attempt to Delete Another Admin (Should Fail)**:
+   ```powershell
+   # First create another admin directly in the database
+   # This requires direct database access as the API doesn't allow creating admins
+   
+   # Then attempt to delete the other admin (should fail)
+   try {
+       $otherAdminDeleteResponse = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/users/$otherAdminId" -Method Delete -Headers @{
+           "Authorization" = "Bearer $adminToken"
+       }
+       Write-Host "ERROR: Deleting another admin should not be allowed"
+   } catch {
+       $statusCode = $_.Exception.Response.StatusCode.value__
+       Write-Host "Expected error occurred: Cannot delete other admin (Status code: $statusCode)"
+   }
+   ```
+
+### Testing Bulk User Deletion
+
+The bulk deletion endpoint is powerful and should be tested carefully:
+
+1. **Create Multiple Test Users**:
+   ```powershell
+   # Create several test users
+   for ($i = 1; $i -le 5; $i++) {
+       $bulkTestUser = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Post -Headers @{
+           "Authorization" = "Bearer $adminToken"
+       } -ContentType 'application/json' -Body "{
+           `"username`": `"bulktest$i`", 
+           `"email`": `"bulktest$i@example.com`", 
+           `"password`": `"Password123!`", 
+           `"role`": `"user`",
+           `"skipVerification`": true
+       }"
+   }
+   
+   # Check how many users exist before bulk deletion
+   $usersBefore = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   }
+   $countBefore = $usersBefore.users.Count
+   Write-Host "Users before bulk deletion: $countBefore"
+   ```
+
+2. **Bulk Delete with Confirmation**:
+   ```powershell
+   # Perform bulk deletion with preserveAdmins=true (default)
+   $bulkDeleteResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Delete -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   } -ContentType 'application/json' -Body '{
+       "confirmDelete": "DELETE_ALL_USERS"
+   }'
+   
+   # Check the response
+   $bulkDeleteResponse
+   ```
+
+3. **Verify Bulk Deletion**:
+   ```powershell
+   # Check how many users exist after bulk deletion
+   $usersAfter = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
+       "Authorization" = "Bearer $adminToken"
+   }
+   $countAfter = $usersAfter.users.Count
+   Write-Host "Users after bulk deletion: $countAfter"
+   
+   # Should only have admin users remaining
+   $nonAdminUsers = $usersAfter.users | Where-Object { $_.role -ne "admin" }
+   if ($nonAdminUsers) {
+       Write-Host "ERROR: Non-admin users still exist after bulk deletion"
+   } else {
+       Write-Host "SUCCESS: All non-admin users were deleted"
+   }
+   ```
+
+### Testing with curl (Bash/Git Bash)
+
+For bash users, here are the curl commands to test user deletion:
+
+```bash
+# Login as admin
+admin_response=$(curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"AdminPassword123!"}')
+  
+# Extract token
+admin_token=$(echo $admin_response | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+
+# Create a test user to delete
+create_response=$(curl -s -X POST http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer $admin_token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "deletetest",
+    "email": "deletetest@example.com",
+    "password": "Password123!",
+    "role": "user",
+    "skipVerification": true
+  }')
+  
+# Extract user ID
+user_id=$(echo $create_response | grep -o '"userId":"[^"]*"' | cut -d'"' -f4)
+
+# Delete the test user
+curl -X DELETE http://localhost:3000/api/admin/users/$user_id \
+  -H "Authorization: Bearer $admin_token"
+
+# Bulk delete all non-admin users
+curl -X DELETE http://localhost:3000/api/admin/users \
+  -H "Authorization: Bearer $admin_token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "confirmDelete": "DELETE_ALL_USERS"
+  }'
+```
+
+### Common Issues and Troubleshooting
+
+1. **Missing Confirmation for Bulk Delete**:
+   - If you get a 400 error when attempting bulk deletion, check that you've included the exact confirmation string: `"confirmDelete": "DELETE_ALL_USERS"`
+   - Example error: `{"error":"Confirmation required","message":"To delete all users, include {\"confirmDelete\": \"DELETE_ALL_USERS\"} in the request body"}`
+
+2. **Cannot Delete Admin Users**:
+   - The system prevents admins from deleting other admins by design
+   - If you need to delete an admin account, you must do it directly in the database
+
+3. **Tokens Remaining After User Delete**:
+   - When a user is deleted, their refresh tokens should be automatically cleaned up
+   - If you experience token-related issues after deletion, check the MongoDB Token collection:
+     ```bash
+     docker exec -it auth-mongodb mongosh
+     use auth_db
+     db.tokens.find({ userId: ObjectId("deleted-user-id") })
+     ```
+
+4. **Permission Issues**:
+   - Only admin users can delete users
+   - Regular users or supervisors attempting to delete users will receive a 403 Forbidden error
+
+By following these testing procedures, you can ensure that the user deletion functionality works correctly and securely in your authentication system.
 
 ## Architecture Compatibility Issues
 

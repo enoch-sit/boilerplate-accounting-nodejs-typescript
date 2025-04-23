@@ -223,6 +223,8 @@ The system exposes the following API endpoints:
 |----------|--------|-------------|--------------|
 | `/api/admin/users` | GET | Get all users | Admin |
 | `/api/admin/users` | POST | Create a new user | Admin |
+| `/api/admin/users` | DELETE | Delete all users | Admin |
+| `/api/admin/users/:userId` | DELETE | Delete a specific user | Admin |
 | `/api/admin/users/:userId/role` | PUT | Update user role | Admin |
 | `/api/admin/reports` | GET | Access reports | Admin/Supervisor |
 | `/api/admin/dashboard` | GET | Access dashboard | Any Authenticated |

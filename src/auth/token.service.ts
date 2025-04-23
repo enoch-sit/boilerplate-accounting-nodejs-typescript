@@ -196,6 +196,27 @@ export class TokenService {
       return false;
     }
   }
+
+  /**
+   * Delete all refresh tokens from the database.
+   * Use with caution - this will log out all users from all devices.
+   * 
+   * @returns A Promise that resolves to the number of tokens deleted.
+   */
+  async deleteAllRefreshTokens(): Promise<number> {
+    try {
+      // Attempt to delete all refresh tokens from the database
+      const result = await Token.deleteMany({});
+      // Log the operation
+      logger.info(`Deleted all refresh tokens: ${result.deletedCount} tokens removed`);
+      // Return the number of tokens deleted
+      return result.deletedCount;
+    } catch (error) {
+      // Log any errors that occur during deletion
+      logger.error('Delete all refresh tokens error:', error);
+      return 0;
+    }
+  }
 }
 
 export const tokenService = new TokenService();
