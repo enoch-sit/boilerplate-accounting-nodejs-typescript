@@ -27,7 +27,7 @@ services:
       - PASSWORD_RESET_EXPIRES_IN=1h
       - VERIFICATION_CODE_EXPIRES_IN=15m
       - FRONTEND_URL=http://localhost:3000
-      - CORS_ORIGIN=*
+      - CORS_ORIGIN=http://localhost:5173
       - PORT=3000
       - LOG_LEVEL=debug
     depends_on:

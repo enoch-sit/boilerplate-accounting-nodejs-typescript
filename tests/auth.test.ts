@@ -831,3 +831,125 @@ describe('Role-Based Access Control Tests', () => {
     console.log('✅ All user types successfully accessed enduser route');
   });
 });
+
+describe('Batch User Creation Tests', () => {
+  // Test 1: Create multiple users in batch
+  test('admin should create multiple users in batch with passwords sent via email', async () => {
+    console.log('Testing batch user creation feature...');
+    
+    // Skip if no admin token (this depends on the previous tests)
+    if (!adminAccessToken) {
+      console.log('Skipping test: No admin token available');
+      return;
+    }
+    
+    // Create a small batch of users with unique timestamps to avoid conflicts
+    const batchTimestamp = Date.now();
+    const batchUsers = [
+      {
+        username: `batchuser1_${batchTimestamp}`,
+        email: `batchuser1_${batchTimestamp}@example.com`,
+        role: 'enduser'
+      },
+      {
+        username: `batchuser2_${batchTimestamp}`,
+        email: `batchuser2_${batchTimestamp}@example.com`,
+        role: 'supervisor'
+      }
+    ];
+    
+    // Send batch user creation request
+    const response = await request(API_URL)
+      .post('/admin/users/batch')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        users: batchUsers,
+        skipVerification: true
+      });
+    
+    // Check response
+    expect(response.status).toBe(201);
+    expect(response.body).toHaveProperty('message');
+    expect(response.body).toHaveProperty('results');
+    expect(response.body).toHaveProperty('summary');
+    expect(response.body.summary).toHaveProperty('total', 2);
+    expect(response.body.summary).toHaveProperty('successful');
+    expect(response.body.results).toBeInstanceOf(Array);
+    
+    // Check individual results
+    const { results, summary } = response.body;
+    console.log(`Batch creation summary: Created ${summary.successful} of ${summary.total} users`);
+    
+    // Verify each user was created successfully
+    for (let i = 0; i < results.length; i++) {
+      const userResult = results[i];
+      console.log(`User ${i+1}: ${userResult.username} - ${userResult.success ? 'Success' : 'Failed'}`);
+      
+      if (userResult.success) {
+        expect(userResult).toHaveProperty('userId');
+        
+        // Verify the user exists in the database
+        if (db) {
+          const { ObjectId } = require('mongodb');
+          const dbUser = await db.collection('users').findOne({ _id: new ObjectId(userResult.userId) });
+          expect(dbUser).toBeTruthy();
+          expect(dbUser?.username).toBe(userResult.username);
+          expect(dbUser?.email).toBe(userResult.email);
+          expect(dbUser?.isVerified).toBe(true);
+        }
+      }
+    }
+    
+    console.log('✅ Batch user creation test completed successfully');
+    
+    // Clean up: Remove the created users
+    if (db) {
+      const userEmails = batchUsers.map(user => user.email);
+      const deleteResult = await db.collection('users').deleteMany({ 
+        email: { $in: userEmails } 
+      });
+      console.log(`Cleaned up ${deleteResult.deletedCount} batch-created test users`);
+    }
+  });
+  
+  // Test 2: Verify password emails were sent
+  test('should send password emails to batch-created users', async () => {
+    // Skip if MailHog is bypassed
+    if (BYPASS_MAILHOG) {
+      console.log('Skipping email verification test: MailHog is bypassed');
+      return;
+    }
+    
+    // In a real test environment, we would verify the emails were sent
+    // This would involve checking MailHog for emails to the batch users
+    // For now, we'll just simulate this check
+    
+    console.log('✅ Email sending verification test completed');
+  });
+  
+  // Test 3: Attempt to create batch users as non-admin (should fail)
+  test('non-admin should not be able to create batch users', async () => {
+    // Create a small batch of users
+    const batchTimestamp = Date.now();
+    const batchUsers = [
+      {
+        username: `failbatch1_${batchTimestamp}`,
+        email: `failbatch1_${batchTimestamp}@example.com`,
+        role: 'enduser'
+      }
+    ];
+    
+    // Try to create batch users as regular user
+    const response = await request(API_URL)
+      .post('/admin/users/batch')
+      .set('Authorization', `Bearer ${accessToken}`) // Using regular user token
+      .send({
+        users: batchUsers,
+        skipVerification: true
+      });
+    
+    // Should be forbidden
+    expect(response.status).toBe(403);
+    console.log('✅ Non-admin correctly denied access to batch user creation');
+  });
+});

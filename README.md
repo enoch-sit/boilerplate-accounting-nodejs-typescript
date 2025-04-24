@@ -30,14 +30,14 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 | `/api/auth/forgot-password`    | POST   | Request password reset                | Public            |
 | `/api/auth/reset-password`     | POST   | Reset password with token             | Public            |
 
-### Protected Routes (`/api/protected`)
+### Protected Routes (`/api`)
 
 | Endpoint                       | Method | Description                           | Access Level      |
 |--------------------------------|--------|---------------------------------------|-------------------|
-| `/api/protected/profile`       | GET    | Get user profile                      | Authenticated     |
-| `/api/protected/profile`       | PUT    | Update user profile                   | Authenticated     |
-| `/api/protected/change-password`| POST   | Change password                       | Authenticated     |
-| `/api/protected/dashboard`     | GET    | Access protected dashboard content    | Authenticated     |
+| `/api/profile`                 | GET    | Get user profile                      | Authenticated     |
+| `/api/profile`                 | PUT    | Update user profile                   | Authenticated     |
+| `/api/change-password`         | POST   | Change password                       | Authenticated     |
+| `/api/dashboard`               | GET    | Access protected dashboard content    | Authenticated     |
 
 ### Admin Routes (`/api/admin`)
 
@@ -45,11 +45,19 @@ A robust authentication system built with TypeScript, Express, and MongoDB. Feat
 |--------------------------------|--------|---------------------------------------|-------------------|
 | `/api/admin/users`             | GET    | Get all users                         | Admin             |
 | `/api/admin/users`             | POST   | Create a new user                     | Admin             |
+| `/api/admin/users/batch`       | POST   | Create multiple users at once         | Admin             |
 | `/api/admin/users`             | DELETE | Delete all users                      | Admin             |
 | `/api/admin/users/:userId`     | DELETE | Delete a specific user                | Admin             |
 | `/api/admin/users/:userId/role`| PUT    | Update user role                      | Admin             |
 | `/api/admin/reports`           | GET    | Access reports                        | Admin/Supervisor  |
 | `/api/admin/dashboard`         | GET    | Access dashboard                      | Any Authenticated |
+
+### Miscellaneous Endpoints
+
+| Endpoint                       | Method | Description                           | Access Level      |
+|--------------------------------|--------|---------------------------------------|-------------------|
+| `/health`                      | GET    | Health check endpoint                 | Public            |
+| `/api/testing/*`               | Various| Testing endpoints (dev mode only)     | Development       |
 
 ## System Architecture
 
@@ -101,7 +109,7 @@ Each higher role inherits all permissions from the roles below it.
 
    Create a `.env.development` file in the root directory:
 
-   ```
+   ``` 
    PORT=3000
    NODE_ENV=development
    MONGO_URI=mongodb://localhost:27017/auth_db

@@ -428,6 +428,130 @@ export class AuthService {
       return { success: false, message: 'User creation failed' };
     }
   }
+
+  /**
+   * Create multiple users at once as an administrator and send passwords via email.
+   * 
+   * @param users - Array of user objects containing username, email, and optional role.
+   * @param skipVerification - Whether to mark the users as verified immediately.
+   * @returns A Promise that resolves to an object containing success status, results for each user, and a summary.
+   */
+  async adminCreateBatchUsers(
+    users: Array<{username: string, email: string, role?: UserRole}>,
+    skipVerification: boolean = true
+  ): Promise<{
+    success: boolean,
+    results: Array<{username: string, email: string, success: boolean, message: string, userId?: string}>,
+    summary: {total: number, successful: number, failed: number}
+  }> {
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    try {
+      // Process each user in the batch
+      for (const userInfo of users) {
+        try {
+          // Generate a random password
+          const password = this.generateRandomPassword();
+          
+          // Create the user
+          const result = await this.adminCreateUser(
+            userInfo.username,
+            userInfo.email,
+            password,
+            userInfo.role || UserRole.ENDUSER,
+            skipVerification
+          );
+          
+          if (result.success) {
+            // Send password notification email
+            await emailService.sendPasswordNotificationEmail(
+              userInfo.email,
+              userInfo.username,
+              password
+            );
+            
+            successCount++;
+            results.push({
+              username: userInfo.username,
+              email: userInfo.email,
+              success: true,
+              message: 'User created successfully. Password sent via email.',
+              userId: result.userId
+            });
+          } else {
+            failCount++;
+            results.push({
+              username: userInfo.username,
+              email: userInfo.email,
+              success: false,
+              message: result.message
+            });
+          }
+        } catch (error) {
+          failCount++;
+          logger.error(`Error creating user ${userInfo.username}:`, error);
+          results.push({
+            username: userInfo.username,
+            email: userInfo.email,
+            success: false,
+            message: 'User creation failed due to an error'
+          });
+        }
+      }
+      
+      // Log the summary of the batch operation
+      logger.info(`Batch user creation completed. Created: ${successCount}, Failed: ${failCount}, Total: ${users.length}`);
+      
+      return {
+        success: successCount > 0,
+        results,
+        summary: {
+          total: users.length,
+          successful: successCount,
+          failed: failCount
+        }
+      };
+    } catch (error) {
+      logger.error('Batch user creation error:', error);
+      return {
+        success: false,
+        results,
+        summary: {
+          total: users.length,
+          successful: successCount,
+          failed: failCount
+        }
+      };
+    }
+  }
+  
+  /**
+   * Generate a random secure password.
+   * 
+   * @returns A random password string.
+   */
+  private generateRandomPassword(): string {
+    const length = 12;
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    
+    // Ensure at least one of each character type
+    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
+    password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
+    password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
+    password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special char
+    
+    // Fill the rest of the password
+    for (let i = 4; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * charset.length);
+      password += charset[randomIndex];
+    }
+    
+    // Shuffle the password to avoid predictable patterns
+    return password.split('').sort(() => 0.5 - Math.random()).join('');
+  }
 }
 
 export const authService = new AuthService();

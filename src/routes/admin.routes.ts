@@ -65,6 +65,62 @@ router.post('/users', authenticate, requireAdmin, async (req: Request, res: Resp
   }
 });
 
+// Create multiple users at once (admin only)
+router.post('/users/batch', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { users, skipVerification = true } = req.body;
+    
+    // Validate input
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ error: 'A non-empty array of users is required' });
+    }
+    
+    // Validate each user has required fields
+    for (const user of users) {
+      if (!user.username || !user.email) {
+        return res.status(400).json({ 
+          error: 'Each user must have a username and email',
+          invalidUser: user
+        });
+      }
+      
+      // Validate role if provided
+      if (user.role && !Object.values(UserRole).includes(user.role)) {
+        return res.status(400).json({ 
+          error: 'Invalid role provided',
+          invalidUser: user
+        });
+      }
+      
+      // Prevent creating admin users
+      if (user.role === UserRole.ADMIN) {
+        logger.warn(`Batch admin user creation attempt by ${req.user?.username} - This action is restricted`);
+        return res.status(403).json({ 
+          error: 'Creating admin users is restricted',
+          invalidUser: user
+        });
+      }
+    }
+    
+    // Create the users in batch
+    const result = await authService.adminCreateBatchUsers(
+      users,
+      skipVerification === true
+    );
+    
+    logger.info(`Batch user creation by admin ${req.user?.username}. Created: ${result.summary.successful}, Failed: ${result.summary.failed}, Total: ${result.summary.total}`);
+    
+    res.status(201).json({
+      message: `${result.summary.successful} of ${result.summary.total} users created successfully`,
+      results: result.results,
+      summary: result.summary
+    });
+  } catch (error) {
+    logger.error('Admin batch create users error:', error);
+    res.status(500).json({ error: 'Batch user creation failed' });
+  }
+});
+
 // Update user role (admin only)
 router.put('/users/:userId/role', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
