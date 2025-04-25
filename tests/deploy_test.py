@@ -381,6 +381,38 @@ class AuthApiTester:
         except Exception as e:
             self.log_result("Access Protected Route", False, details=str(e))
             return False
+    
+    def update_user_profile(self):
+        """Test: Update user profile."""
+        if not self.access_token:
+            self.log_result("Update User Profile", False, "No access token available")
+            return False
+            
+        try:
+            # Generate a new username with timestamp to ensure uniqueness
+            new_username = f"{self.current_user['username']}_{int(time.time())}"
+            
+            response = self.session.put(
+                f"{self.base_url}/api/profile",
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                json={"username": new_username}
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                # Update the stored username if successful
+                old_username = self.current_user["username"]
+                self.current_user["username"] = new_username
+                details = f"Username updated from '{old_username}' to '{new_username}'"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Update User Profile", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Update User Profile", False, details=str(e))
+            return False
 
     def refresh_token_test(self):
         """Test 6: Refresh the access token using the refresh token."""
@@ -791,6 +823,225 @@ class AuthApiTester:
         self.logout_user()
         
         return True
+
+    def change_password(self):
+        """Test changing password."""
+        if not self.access_token:
+            self.log_result("Change Password", False, "No access token available")
+            return False
+            
+        try:
+            current_password = self.current_user["password"]
+            new_password = f"NewPass{int(time.time())}!"
+            
+            response = self.session.post(
+                f"{self.base_url}/api/change-password",
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                json={
+                    "currentPassword": current_password,
+                    "newPassword": new_password
+                }
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                # Update the stored password if successful
+                self.current_user["password"] = new_password
+                details = f"Password successfully changed"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Change Password", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Change Password", False, details=str(e))
+            return False
+            
+    def access_dashboard(self):
+        """Test accessing protected dashboard."""
+        if not self.access_token:
+            self.log_result("Access Dashboard", False, "No access token available")
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{self.base_url}/api/dashboard",
+                headers={"Authorization": f"Bearer {self.access_token}"}
+            )
+            
+            passed = response.status_code == 200
+            details = f"Status code: {response.status_code}"
+            if passed:
+                user_info = response.json().get("user", {})
+                details += f", Username: {user_info.get('username')}, Role: {user_info.get('role')}"
+            else:
+                details += f", Response: {response.text}"
+                
+            self.log_result("Access Dashboard", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Access Dashboard", False, details=str(e))
+            return False
+            
+    def admin_update_user_role(self):
+        """Test updating a user's role as admin."""
+        if not self.admin_token:
+            self.log_result("Admin Update Role", False, "No admin token available")
+            return False
+            
+        # Create a test user to update their role
+        new_user = self.generate_test_user()
+        created_user_id = None
+        
+        try:
+            # Create the user first
+            response = self.session.post(
+                f"{self.base_url}/api/admin/users",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={
+                    "username": new_user["username"],
+                    "email": new_user["email"],
+                    "password": new_user["password"],
+                    "role": "user",
+                    "skipVerification": True
+                }
+            )
+            
+            if response.status_code not in [200, 201]:
+                self.log_result("Admin Update Role", False, "Failed to create test user for role update")
+                return False
+                
+            response_data = response.json()
+            created_user_id = response_data.get("userId") or response_data.get("id")
+            
+            if not created_user_id:
+                self.log_result("Admin Update Role", False, "No user ID in response")
+                return False
+                
+            # Now update the user's role
+            response = self.session.put(
+                f"{self.base_url}/api/admin/users/{created_user_id}/role",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={"role": "supervisor"}
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                updated_user = response.json().get("user", {})
+                details = f"User role updated to '{updated_user.get('role')}' for user '{updated_user.get('username')}'"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Admin Update Role", passed, details)
+            
+            # Clean up - delete the test user
+            self.admin_delete_user(created_user_id)
+            
+            return passed
+        except Exception as e:
+            self.log_result("Admin Update Role", False, details=str(e))
+            # Try to clean up even if there was an error
+            if created_user_id:
+                try:
+                    self.admin_delete_user(created_user_id)
+                except:
+                    pass
+            return False
+            
+    def admin_batch_create_users(self):
+        """Test batch creation of users as admin."""
+        if not self.admin_token:
+            self.log_result("Admin Batch Create Users", False, "No admin token available")
+            return False
+            
+        # Create batch of test users
+        batch_users = []
+        for i in range(3):
+            new_user = self.generate_test_user()
+            batch_users.append({
+                "username": new_user["username"],
+                "email": new_user["email"],
+                "password": new_user["password"],
+                "role": "user" if i % 2 == 0 else "supervisor"
+            })
+            
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/admin/users/batch",
+                headers={"Authorization": f"Bearer {self.admin_token}"},
+                json={
+                    "users": batch_users,
+                    "skipVerification": True
+                }
+            )
+            
+            passed = response.status_code == 201
+            
+            if passed:
+                result_data = response.json()
+                summary = result_data.get("summary", {})
+                details = f"Created {summary.get('successful')} of {summary.get('total')} users in batch"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Admin Batch Create Users", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Admin Batch Create Users", False, details=str(e))
+            return False
+            
+    def testing_get_verification_token(self):
+        """Test the testing route for verification token."""
+        if not self.user_id:
+            self.log_result("Testing Get Verification Token", False, "No user ID available")
+            return False
+            
+        try:
+            response = self.session.get(
+                f"{self.base_url}/api/testing/verification-token/{self.user_id}"
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                token_data = response.json()
+                token = token_data.get("token")
+                details = f"Retrieved verification token: {token[:10]}..." if token else "No token in response"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Testing Get Verification Token", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Testing Get Verification Token", False, details=str(e))
+            return False
+            
+    def testing_verify_user(self):
+        """Test the testing route for direct user verification."""
+        if not self.user_id:
+            self.log_result("Testing Verify User", False, "No user ID available")
+            return False
+            
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/testing/verify-user/{self.user_id}"
+            )
+            
+            passed = response.status_code == 200
+            
+            if passed:
+                user_data = response.json().get("user", {})
+                details = f"Directly verified user: {user_data.get('username')}"
+            else:
+                details = f"Status code: {response.status_code}, Response: {response.text}"
+                
+            self.log_result("Testing Verify User", passed, details)
+            return passed
+        except Exception as e:
+            self.log_result("Testing Verify User", False, details=str(e))
+            return False
 
 
 def main():

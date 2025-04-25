@@ -63,7 +63,7 @@ router.post('/verify-user/:userId', async (req: Request, res: Response) => {
     // Find and update the user
     const user = await User.findByIdAndUpdate(
       userId,
-      { isEmailVerified: true },
+      { isVerified: true },
       { new: true }
     );
     
@@ -83,7 +83,7 @@ router.post('/verify-user/:userId', async (req: Request, res: Response) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        isEmailVerified: user.isEmailVerified
+        isEmailVerified: user.isVerified // Aligning with documentation
       }
     });
   } catch (error: any) {

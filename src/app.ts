@@ -6,10 +6,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/db.config';
 import { initializeEmailTransporter } from './config/email.config';
-import authRoutes from './routes/auth.routes';
-import protectedRoutes from './routes/protected.routes';
-import adminRoutes from './routes/admin.routes';
-import testingRoutes from './routes/testing.routes';
+import routes from './routes';
 import { errorHandler, setupErrorHandling } from './utils/error-handler';
 import { logger } from './utils/logger';
 
@@ -59,16 +56,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api', protectedRoutes);
-app.use('/api/admin', adminRoutes); // Add admin routes
-
-// Testing routes (only in development/test environment)
-if (process.env.NODE_ENV !== 'production') {
-  logger.info('Enabling testing routes (DEVELOPMENT MODE ONLY)');
-  app.use('/api/testing', testingRoutes);
-}
+// Routes - now using the consolidated routes file
+app.use('/api', routes);
 
 // Health check
 app.get('/health', (req, res) => {
