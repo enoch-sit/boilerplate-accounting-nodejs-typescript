@@ -41,6 +41,7 @@ POST /api/auth/signup
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "username": "string",
@@ -50,6 +51,7 @@ POST /api/auth/signup
 ```
 
 **Response (201 Created)**:
+
 ```json
 {
   "message": "User registered successfully. Verification email has been sent.",
@@ -58,6 +60,7 @@ POST /api/auth/signup
 ```
 
 **Possible Errors**:
+
 - 400: Missing required fields
 - 400: Username already exists
 - 400: Email already exists
@@ -74,6 +77,7 @@ POST /api/auth/verify-email
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "token": "string"
@@ -81,6 +85,7 @@ POST /api/auth/verify-email
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Email verified successfully"
@@ -88,6 +93,7 @@ POST /api/auth/verify-email
 ```
 
 **Possible Errors**:
+
 - 400: Token is required
 - 400: Email verification failed
 - 500: Email verification failed
@@ -103,6 +109,7 @@ POST /api/auth/resend-verification
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "email": "string"
@@ -110,6 +117,7 @@ POST /api/auth/resend-verification
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Verification code resent"
@@ -117,6 +125,7 @@ POST /api/auth/resend-verification
 ```
 
 **Possible Errors**:
+
 - 400: Email is required
 - 400: Failed to resend verification code
 - 500: Failed to resend verification code
@@ -132,6 +141,7 @@ POST /api/auth/login
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "username": "string", 
@@ -140,6 +150,7 @@ POST /api/auth/login
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Login successful",
@@ -156,6 +167,7 @@ POST /api/auth/login
 ```
 
 **Possible Errors**:
+
 - 400: Missing required fields
 - 401: Invalid credentials
 - 401: Email not verified
@@ -172,6 +184,7 @@ POST /api/auth/refresh
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "refreshToken": "string"
@@ -179,6 +192,7 @@ POST /api/auth/refresh
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Token refreshed successfully",
@@ -187,6 +201,7 @@ POST /api/auth/refresh
 ```
 
 **Possible Errors**:
+
 - 400: Refresh token is required
 - 401: Invalid refresh token
 - 500: Token refresh failed
@@ -202,6 +217,7 @@ POST /api/auth/logout
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "refreshToken": "string"
@@ -209,6 +225,7 @@ POST /api/auth/logout
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Logout successful"
@@ -216,6 +233,7 @@ POST /api/auth/logout
 ```
 
 **Possible Errors**:
+
 - 500: Logout failed
 
 ### Logout from All Devices
@@ -229,11 +247,13 @@ POST /api/auth/logout-all
 **Access Level**: Authenticated
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Logged out from all devices"
@@ -241,6 +261,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Authentication required
 - 500: Logout failed
 
@@ -255,6 +276,7 @@ POST /api/auth/forgot-password
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "email": "string"
@@ -262,6 +284,7 @@ POST /api/auth/forgot-password
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "If your email exists in our system, you will receive a password reset link"
@@ -279,6 +302,7 @@ POST /api/auth/reset-password
 **Access Level**: Public
 
 **Request Body**:
+
 ```json
 {
   "token": "string",
@@ -287,6 +311,7 @@ POST /api/auth/reset-password
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Password reset successful"
@@ -294,6 +319,7 @@ POST /api/auth/reset-password
 ```
 
 **Possible Errors**:
+
 - 400: Token and new password are required
 - 400: Password reset failed
 - 500: Password reset failed
@@ -315,11 +341,13 @@ GET /api/profile
 **Access Level**: Authenticated
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "user": {
@@ -335,6 +363,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Not authenticated
 - 404: User not found
 - 500: Failed to fetch profile
@@ -350,11 +379,13 @@ PUT /api/profile
 **Access Level**: Authenticated
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Request Body**:
+
 ```json
 {
   "username": "string",
@@ -363,6 +394,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "user": {
@@ -378,6 +410,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Username already taken
 - 400: Email already taken
 - 401: Not authenticated
@@ -395,11 +428,13 @@ POST /api/change-password
 **Access Level**: Authenticated
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Request Body**:
+
 ```json
 {
   "currentPassword": "string",
@@ -408,6 +443,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Password changed successfully"
@@ -415,6 +451,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Current password and new password are required
 - 400: Current password is incorrect
 - 401: Not authenticated
@@ -432,11 +469,13 @@ GET /api/dashboard
 **Access Level**: Authenticated
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "This is protected content for your dashboard",
@@ -449,6 +488,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Authentication required
 
 ---
@@ -468,11 +508,13 @@ GET /api/admin/users
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "users": [
@@ -490,6 +532,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Authentication required
 - 403: Admin access required
 - 500: Failed to fetch users
@@ -505,11 +548,13 @@ POST /api/admin/users
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Request Body**:
+
 ```json
 {
   "username": "string",
@@ -521,6 +566,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (201 Created)**:
+
 ```json
 {
   "message": "User created successfully",
@@ -529,6 +575,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Missing required fields
 - 400: Invalid role
 - 401: Authentication required
@@ -547,11 +594,13 @@ POST /api/admin/users/batch
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Request Body**:
+
 ```json
 {
   "users": [
@@ -571,6 +620,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (201 Created)**:
+
 ```json
 {
   "message": "X of Y users created successfully",
@@ -592,6 +642,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: A non-empty array of users is required
 - 400: Each user must have a username and email
 - 400: Invalid role provided
@@ -601,6 +652,7 @@ Authorization: Bearer <access_token>
 - 500: Batch user creation failed
 
 **Notes**:
+
 - A secure random password is generated for each user
 - Passwords are sent directly to users via email
 - Failed user creations do not affect successful ones
@@ -617,11 +669,13 @@ DELETE /api/admin/users
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Request Body**:
+
 ```json
 {
   "confirmDelete": "DELETE_ALL_USERS",
@@ -630,6 +684,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "X users deleted successfully",
@@ -638,6 +693,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Confirmation required
 - 401: Authentication required
 - 403: Admin access required
@@ -654,14 +710,17 @@ DELETE /api/admin/users/:userId
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **URL Parameters**:
+
 - `userId`: The ID of the user to delete
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "User deleted successfully",
@@ -674,6 +733,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Cannot delete your own account
 - 401: Authentication required
 - 403: Admin access required
@@ -692,14 +752,17 @@ PUT /api/admin/users/:userId/role
 **Access Level**: Admin
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **URL Parameters**:
+
 - `userId`: The ID of the user to update
 
 **Request Body**:
+
 ```json
 {
   "role": "string"
@@ -707,6 +770,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "user": {
@@ -722,6 +786,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 400: Invalid role
 - 401: Authentication required
 - 403: Admin access required
@@ -739,11 +804,13 @@ GET /api/admin/reports
 **Access Level**: Admin/Supervisor
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "Reports accessed successfully",
@@ -752,6 +819,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Authentication required
 - 403: Supervisor access required
 
@@ -766,11 +834,13 @@ GET /api/admin/dashboard
 **Access Level**: Any Authenticated User
 
 **Headers**:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "User dashboard accessed successfully",
@@ -779,7 +849,64 @@ Authorization: Bearer <access_token>
 ```
 
 **Possible Errors**:
+
 - 401: Authentication required
+
+### Reset User Password
+
+```
+POST /api/admin/users/:userId/reset-password
+```
+
+**Description**: Resets a user's password. Admins can either specify a new password or have the system generate a secure random password.
+
+**Access Level**: Admin
+
+**Headers**:
+
+```
+Authorization: Bearer <access_token>
+```
+
+**URL Parameters**:
+
+- `userId`: The ID of the user whose password will be reset
+
+**Request Body**:
+
+```json
+{
+  "newPassword": "string",  // Required unless generateRandom is true
+  "generateRandom": boolean // Optional, defaults to false
+}
+```
+
+**Response (200 OK)**:
+
+```json
+{
+  "message": "User password reset successfully",
+  "user": {
+    "username": "string",
+    "email": "string"
+  },
+  "generatedPassword": "string" // Only included if generateRandom was true
+}
+```
+
+**Possible Errors**:
+
+- 400: New password is required unless generateRandom is true
+- 401: Authentication required
+- 403: Admin access required
+- 404: User not found
+- 500: Failed to reset user password
+
+**Notes**:
+
+- If `generateRandom` is set to true, the system will generate a secure random password
+- The generated password is returned in the response, so the admin can provide it to the user
+- If `generateRandom` is false, the `newPassword` field is required
 
 ---
 
@@ -798,10 +925,12 @@ GET /api/testing/verification-token/:userId/:type?
 **Access Level**: Development
 
 **URL Parameters**:
+
 - `userId`: The ID of the user
 - `type` (optional): The type of verification (default: EMAIL)
 
 **Response (200 OK)**:
+
 ```json
 {
   "token": "string",
@@ -811,6 +940,7 @@ GET /api/testing/verification-token/:userId/:type?
 ```
 
 **Possible Errors**:
+
 - 400: User ID is required
 - 400: Invalid user ID format
 - 404: No verification token found for this user
@@ -827,9 +957,11 @@ POST /api/testing/verify-user/:userId
 **Access Level**: Development
 
 **URL Parameters**:
+
 - `userId`: The ID of the user to verify
 
 **Response (200 OK)**:
+
 ```json
 {
   "message": "User email verified successfully",
@@ -843,6 +975,7 @@ POST /api/testing/verify-user/:userId
 ```
 
 **Possible Errors**:
+
 - 400: User ID is required
 - 400: Invalid user ID format
 - 404: User not found
@@ -863,6 +996,7 @@ GET /health
 **Access Level**: Public
 
 **Response (200 OK)**:
+
 ```json
 {
   "status": "ok"

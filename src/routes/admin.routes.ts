@@ -6,6 +6,7 @@ import { authService } from '../auth/auth.service';
 import { logger } from '../utils/logger';
 import { tokenService } from '../auth/token.service';
 import { Types } from 'mongoose';
+import { passwordService } from '../services/password.service';
 
 const router = Router();
 
@@ -147,6 +148,50 @@ router.put('/users/:userId/role', authenticate, requireAdmin, async (req: Reques
   } catch (error) {
     logger.error('Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+// Reset user password (admin only)
+router.post('/users/:userId/reset-password', authenticate, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword, generateRandom = false } = req.body;
+    
+    // Validate user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Generate a random password if requested, or use the provided one
+    let password = newPassword;
+    if (generateRandom) {
+      // Generate a secure random password
+      password = passwordService.generateSecurePassword();
+    } else if (!password) {
+      return res.status(400).json({ error: 'New password is required unless generateRandom is true' });
+    }
+    
+    // Update the user's password
+    const hashedPassword = await passwordService.hashPassword(password);
+    await User.findByIdAndUpdate(userId, { password: hashedPassword });
+    
+    // Log the action
+    logger.info(`Password reset for user ${user.username} by admin ${req.user?.username}`);
+    
+    // Return response
+    res.status(200).json({ 
+      message: 'User password reset successfully',
+      user: {
+        username: user.username,
+        email: user.email
+      },
+      // Only include the generated password in the response if it was randomly generated
+      ...(generateRandom && { generatedPassword: password })
+    });
+  } catch (error) {
+    logger.error('Error resetting user password:', error);
+    res.status(500).json({ error: 'Failed to reset user password' });
   }
 });
 

@@ -1,0 +1,104 @@
+{
+  "api_url": "http://localhost:3000",
+  "test_date": "2025-04-26 14:09:53",
+  "passed": 16,
+  "total": 16,
+  "pass_rate": 100.0,
+  "results": [
+    {
+      "test": "Health Check",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:13"
+    },
+    {
+      "test": "User Sign Up",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:13",
+      "details": "User ID: 680c788b321a273eb6d5af0b"
+    },
+    {
+      "test": "Email Verification",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:29",
+      "details": "Status code: 200, Response: {\"message\":\"Email verified successfully\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:29",
+      "details": "Tokens received"
+    },
+    {
+      "test": "Access Protected Route",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:29",
+      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"680c788b321a273eb6d5af0b\",\"username\":\"testuser_0a9662fb\",\"email\":\"test.0a9662fb@exam..."
+    },
+    {
+      "test": "Refresh Token",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:29",
+      "details": "New access token received: eyJhbGciOiJIUzI..."
+    },
+    {
+      "test": "Request Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:35",
+      "details": "Status code: 200, Response: {\"message\":\"If your email exists in our system, you will receive a password reset link\"}"
+    },
+    {
+      "test": "Password Reset",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:44",
+      "details": "Status code: 200, Response: {\"message\":\"Password reset successful\"}"
+    },
+    {
+      "test": "User Login",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:44",
+      "details": "Tokens received"
+    },
+    {
+      "test": "User Logout",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:44",
+      "details": "Status code: 200, Response: {\"message\":\"Logout successful\"}"
+    },
+    {
+      "test": "Admin Login",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:52",
+      "details": "Admin login successful"
+    },
+    {
+      "test": "Admin Create User User",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:52",
+      "details": "Created user with role 'user', ID: 680c78b4321a273eb6d5af2a"
+    },
+    {
+      "test": "Admin Create Supervisor User",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:53",
+      "details": "Created user with role 'supervisor', ID: 680c78b4321a273eb6d5af2e"
+    },
+    {
+      "test": "List Users",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:53",
+      "details": "Found 8 users"
+    },
+    {
+      "test": "Admin Delete User",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:53",
+      "details": "Successfully deleted user with ID: 680c78b4321a273eb6d5af33, Username: testuser_7f70f308, Email: test.7f70f308@example.com"
+    },
+    {
+      "test": "Admin Bulk Delete Users",
+      "passed": true,
+      "timestamp": "2025-04-26 14:09:53",
+      "details": "9 users deleted successfully"
+    }
+  ]
+}
