@@ -1,6 +1,6 @@
 {
   "api_url": "http://localhost:3000",
-  "test_date": "2025-04-25 16:34:15",
+  "test_date": "2025-04-26 13:41:57",
   "passed": 16,
   "total": 16,
   "pass_rate": 100.0,
@@ -8,97 +8,97 @@
     {
       "test": "Health Check",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:35"
+      "timestamp": "2025-04-26 13:41:20"
     },
     {
       "test": "User Sign Up",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:35",
-      "details": "User ID: 680b48dfba55a64167f07ae4"
+      "timestamp": "2025-04-26 13:41:20",
+      "details": "User ID: 680c72011f8bed867e847ef3"
     },
     {
       "test": "Email Verification",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:42",
+      "timestamp": "2025-04-26 13:41:37",
       "details": "Status code: 200, Response: {\"message\":\"Email verified successfully\"}"
     },
     {
       "test": "User Login",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:42",
+      "timestamp": "2025-04-26 13:41:37",
       "details": "Tokens received"
     },
     {
       "test": "Access Protected Route",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:42",
-      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"680b48dfba55a64167f07ae4\",\"username\":\"testuser_a578f1e0\",\"email\":\"test.a578f1e0@exam..."
+      "timestamp": "2025-04-26 13:41:37",
+      "details": "Status code: 200, Response: {\"user\":{\"_id\":\"680c72011f8bed867e847ef3\",\"username\":\"testuser_8c694f77\",\"email\":\"test.8c694f77@exam..."
     },
     {
       "test": "Refresh Token",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:42",
+      "timestamp": "2025-04-26 13:41:38",
       "details": "New access token received: eyJhbGciOiJIUzI..."
     },
     {
       "test": "Request Password Reset",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:48",
+      "timestamp": "2025-04-26 13:41:40",
       "details": "Status code: 200, Response: {\"message\":\"If your email exists in our system, you will receive a password reset link\"}"
     },
     {
       "test": "Password Reset",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:59",
+      "timestamp": "2025-04-26 13:41:49",
       "details": "Status code: 200, Response: {\"message\":\"Password reset successful\"}"
     },
     {
       "test": "User Login",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:59",
+      "timestamp": "2025-04-26 13:41:49",
       "details": "Tokens received"
     },
     {
       "test": "User Logout",
       "passed": true,
-      "timestamp": "2025-04-25 16:33:59",
+      "timestamp": "2025-04-26 13:41:49",
       "details": "Status code: 200, Response: {\"message\":\"Logout successful\"}"
     },
     {
       "test": "Admin Login",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:14",
+      "timestamp": "2025-04-26 13:41:56",
       "details": "Admin login successful"
     },
     {
       "test": "Admin Create User User",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:14",
-      "details": "Created user with role 'user', ID: 680b4906ba55a64167f07b03"
+      "timestamp": "2025-04-26 13:41:56",
+      "details": "Created user with role 'user', ID: 680c72251f8bed867e847f12"
     },
     {
       "test": "Admin Create Supervisor User",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:14",
-      "details": "Created user with role 'supervisor', ID: 680b4906ba55a64167f07b07"
+      "timestamp": "2025-04-26 13:41:56",
+      "details": "Created user with role 'supervisor', ID: 680c72251f8bed867e847f16"
     },
     {
       "test": "List Users",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:14",
-      "details": "Found 11 users"
+      "timestamp": "2025-04-26 13:41:56",
+      "details": "Found 8 users"
     },
     {
       "test": "Admin Delete User",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:15",
-      "details": "Successfully deleted user with ID: 680b4907ba55a64167f07b0c, Username: testuser_51748b2a, Email: test.51748b2a@example.com"
+      "timestamp": "2025-04-26 13:41:56",
+      "details": "Successfully deleted user with ID: 680c72251f8bed867e847f1b, Username: testuser_1777305d, Email: test.1777305d@example.com"
     },
     {
       "test": "Admin Bulk Delete Users",
       "passed": true,
-      "timestamp": "2025-04-25 16:34:15",
-      "details": "13 users deleted successfully"
+      "timestamp": "2025-04-26 13:41:57",
+      "details": "10 users deleted successfully"
     }
   ]
 }
