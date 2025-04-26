@@ -28,9 +28,10 @@ echo.
 echo 1. Test local deployment (localhost:3000)
 echo 2. Test Docker deployment
 echo 3. Test custom URL
+echo 4. Run full test suite (with admin tests)
 echo.
 
-set /p test_option="Enter option (1-3): "
+set /p test_option="Enter option (1-4): "
 
 set api_url=
 set mailhog_url=
@@ -45,6 +46,10 @@ if "%test_option%"=="1" (
     set mailhog_url=http://mailhog:8025
 ) else if "%test_option%"=="3" (
     set /p api_url="Enter API URL (e.g., http://example.com:3000): "
+) else if "%test_option%"=="4" (
+    set /p api_url="Enter API URL (default: http://localhost:3000): "
+    if "%api_url%"=="" set api_url=http://localhost:3000
+    set admin_test=y
 ) else (
     echo Invalid option selected.
     exit /b 1
@@ -68,8 +73,10 @@ if /i "%use_real_email%"=="y" (
     set email_address=
 )
 
-echo.
-set /p admin_test="Run admin API tests? (y/n): "
+if "%test_option%" NEQ "4" (
+    echo.
+    set /p admin_test="Run admin API tests? (y/n): "
+)
 
 echo.
 echo Running deployment tests...
