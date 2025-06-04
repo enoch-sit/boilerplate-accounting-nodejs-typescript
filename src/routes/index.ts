@@ -163,9 +163,21 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
       });
     }
     
+    // Set HTTP-only cookie with new refresh token
+    if (result.refreshToken) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/auth/refresh',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+    }
+    
     res.status(200).json({
       message: result.message,
-      accessToken: result.accessToken
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
     });
   } catch (error: any) {
     logger.error(`Token refresh error: ${error.message}`);

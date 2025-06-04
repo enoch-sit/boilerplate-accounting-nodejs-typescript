@@ -29,6 +29,7 @@ export interface LoginResult {
 export interface TokenRefreshResult {
   success: boolean;
   accessToken?: string;
+  refreshToken?: string;
   message: string;
 }
 
@@ -287,8 +288,7 @@ export class AuthService {
    * 
    * @param refreshToken - The refresh token provided by the user.
    * @returns A Promise that resolves to a TokenRefreshResult object indicating the success or failure of the token refresh.
-   */
-  async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
+   */  async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
     try {
       // Verify the provided refresh token
       const decoded = await tokenService.verifyRefreshToken(refreshToken);
@@ -305,9 +305,21 @@ export class AuthService {
         decoded.role
       );
       
+      // Generate a new refresh token (refresh token rotation)
+      const newRefreshToken = await tokenService.generateRefreshToken(
+        decoded.sub,
+        decoded.username,
+        decoded.email,
+        decoded.role
+      );
+      
+      // Delete the old refresh token from the database
+      await tokenService.deleteRefreshToken(refreshToken);
+      
       return {
         success: true,
         accessToken,
+        refreshToken: newRefreshToken,
         message: 'Token refreshed successfully'
       };
     } catch (error) {

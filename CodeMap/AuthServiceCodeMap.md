@@ -204,7 +204,7 @@ sequenceDiagram
     AuthRoutes-->>Client: 200 OK or 401 Unauthorized
 ```
 
-### 3. Token Refresh Flow
+### 3. Token Refresh Flow (with Rotation)
 
 ```mermaid
 sequenceDiagram
@@ -225,12 +225,28 @@ sequenceDiagram
     TokenModel-->>TokenService: Token record (if exists)
     TokenService-->>AuthService: Decoded token payload or null
     
-    AuthService->>TokenService: generateAccessToken(userId, username, email, role)
-    TokenService-->>AuthService: New access token
+    alt Valid refresh token
+        AuthService->>TokenService: generateAccessToken(userId, username, email, role)
+        TokenService-->>AuthService: New access token
+        
+        AuthService->>TokenService: deleteRefreshToken(oldRefreshToken)
+        TokenService->>TokenModel: Remove old refresh token
+        TokenModel-->>TokenService: Deletion confirmed
+        
+        AuthService->>TokenService: generateRefreshToken(userId, username, email, role)
+        TokenService->>TokenModel: Store new refresh token
+        TokenModel-->>TokenService: Storage confirmed
+        TokenService-->>AuthService: New refresh token
+        
+        AuthService-->>AuthRoutes: TokenRefreshResult {success, accessToken, refreshToken, message}
+        AuthRoutes->>Client: Set HTTP-only cookies for both tokens
+        AuthRoutes-->>Client: 200 OK with new tokens
+    else Invalid refresh token
+        AuthService-->>AuthRoutes: TokenRefreshResult {success: false, message}
+        AuthRoutes-->>Client: 401 Unauthorized
+    end
     
-    AuthService-->>AuthRoutes: TokenRefreshResult {success, accessToken, message}
-    AuthRoutes->>Client: Set HTTP-only cookie with new access token
-    AuthRoutes-->>Client: 200 OK or 401 Unauthorized
+    Note over Client, TokenModel: Token Rotation Security:<br/>Old refresh token is invalidated<br/>New tokens are issued together
 ```
 
 ### 4. Authentication Middleware Flow

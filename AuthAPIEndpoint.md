@@ -10,7 +10,7 @@ All endpoints are relative to the base URL: `http://localhost:3000` (development
 
 Most endpoints require authentication using JWT tokens:
 
-```
+```http
 Authorization: Bearer <access_token>
 ```
 
@@ -32,7 +32,7 @@ Authentication and user management endpoints.
 
 ### Register a New User
 
-```
+```http
 POST /api/auth/signup
 ```
 
@@ -68,7 +68,7 @@ POST /api/auth/signup
 
 ### Verify Email
 
-```
+```http
 POST /api/auth/verify-email
 ```
 
@@ -100,7 +100,7 @@ POST /api/auth/verify-email
 
 ### Resend Verification Code
 
-```
+```http
 POST /api/auth/resend-verification
 ```
 
@@ -132,7 +132,7 @@ POST /api/auth/resend-verification
 
 ### Login
 
-```
+```http
 POST /api/auth/login
 ```
 
@@ -175,11 +175,11 @@ POST /api/auth/login
 
 ### Refresh Token
 
-```
+```http
 POST /api/auth/refresh
 ```
 
-**Description**: Creates a new access token using a valid refresh token.
+**Description**: Creates a new access token using a valid refresh token. This endpoint implements refresh token rotation for enhanced security - each successful refresh invalidates the old refresh token and returns a new one.
 
 **Access Level**: Public
 
@@ -196,7 +196,8 @@ POST /api/auth/refresh
 ```json
 {
   "message": "Token refreshed successfully",
-  "accessToken": "string"
+  "accessToken": "string",
+  "refreshToken": "string"
 }
 ```
 
@@ -206,9 +207,16 @@ POST /api/auth/refresh
 - 401: Invalid refresh token
 - 500: Token refresh failed
 
+**Security Notes**:
+
+- This endpoint implements **refresh token rotation** - the old refresh token is invalidated upon successful refresh
+- A new refresh token is returned in the response and must be used for subsequent refresh operations
+- The new refresh token is also set as an HTTP-only cookie for enhanced security
+- If using the response JSON, make sure to store the new `refreshToken` value
+
 ### Logout
 
-```
+```http
 POST /api/auth/logout
 ```
 
