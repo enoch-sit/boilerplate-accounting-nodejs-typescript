@@ -16,8 +16,52 @@ Authorization: Bearer <access_token>
 
 Access tokens expire after 15 minutes by default. Use the refresh token endpoint to obtain a new access token.
 
+## Role-Based Access Control
+
+The authentication system implements a hierarchical role-based access control (RBAC) system with four distinct user roles defined in `src/models/user.model.ts` (Lines 6-11):
+
+### Role Constants and Hierarchy
+
+```typescript
+export enum UserRole {
+  ADMIN = 'admin',        // Highest privilege level - full system access
+  SUPERVISOR = 'supervisor', // Mid-level privilege - user management
+  ENDUSER = 'enduser',    // Base level access - standard user operations
+  USER = 'user'           // Alias for ENDUSER - backward compatibility
+}
+```
+
+**Role Hierarchy (from highest to lowest privilege):**
+1. **ADMIN** (`'admin'`) - Full system administration capabilities
+2. **SUPERVISOR** (`'supervisor'`) - User management and oversight functions
+3. **ENDUSER/USER** (`'enduser'`/`'user'`) - Standard authenticated user access
+
+### Role Implementation Details
+
+**Code Locations:**
+- **Role Definition**: `src/models/user.model.ts` (Lines 6-11)
+- **Role Middleware**: `src/auth/auth.middleware.ts` (Lines 89-116)
+- **Role Assignment**: `quickCreateAdminPy/create_users.py` (Lines 18-50, 156)
+- **Route Protection**: `src/routes/admin.routes.ts` (Multiple endpoints)
+
+**Role Validation Process:**
+1. JWT token contains user role in payload (`role` claim)
+2. Authentication middleware extracts and validates role from token
+3. Route-specific middleware checks required role permissions
+4. Access granted/denied based on role hierarchy matching
+
+### Endpoint Access Control Matrix
+
+| Endpoint Category | ADMIN | SUPERVISOR | ENDUSER/USER | PUBLIC |
+|------------------|-------|------------|--------------|---------|
+| Auth Routes | ✓ | ✓ | ✓ | ✓ |
+| Protected Routes | ✓ | ✓ | ✓ | ✗ |
+| Admin Routes | ✓ | Limited | ✗ | ✗ |
+| Testing Routes | ✓ | ✓ | ✓ | ✗ |
+
 ## Table of Contents
 
+- [Role-Based Access Control](#role-based-access-control)
 - [Auth Routes](#auth-routes)
 - [Protected Routes](#protected-routes)
 - [Admin Routes](#admin-routes)
@@ -503,6 +547,13 @@ Authorization: Bearer <access_token>
 
 ## Admin Routes
 
+**Base Path**: `/api/admin`
+
+**Global Access Control**: All admin routes require `ADMIN` role authentication
+- **Middleware Chain**: `requireAuth` → `requireRole(UserRole.ADMIN)`
+- **Implementation**: `src/routes/admin.routes.ts`
+- **Role Validation**: Enforced via `src/auth/auth.middleware.ts` (Lines 89-116)
+
 These routes require admin or supervisor privileges.
 
 ### Get All Users
@@ -513,7 +564,12 @@ GET /api/admin/users
 
 **Description**: Returns a list of all users in the system.
 
-**Access Level**: Admin
+**Access Level**: Admin Only (`UserRole.ADMIN`)
+
+**Role-Based Access**:
+- ✅ **ADMIN**: Full access to all users
+- ❌ **SUPERVISOR**: Access denied
+- ❌ **ENDUSER/USER**: Access denied
 
 **Headers**:
 

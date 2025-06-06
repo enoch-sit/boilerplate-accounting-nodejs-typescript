@@ -1,6 +1,106 @@
 # Authentication Service Code Map
 
-This document provides a comprehensive overview of the authentication service architecture and flows in the Simple Accounting application.
+This document provides a comprehensive overview of the authentication service architecture and flows in the Simple Accounting application, including detailed role-based access control implementation.
+
+## Table of Contents
+
+- [Role-Based Access Control](#role-based-access-control)
+- [System Architecture](#system-architecture)
+- [Authentication Service Architecture](#authentication-service-architecture)
+- [JWT Token Service](#jwt-token-service)
+- [Authentication Middleware](#authentication-middleware)
+- [Password Service](#password-service)
+- [Email Service](#email-service)
+- [Database Models](#database-models)
+- [Service Configuration](#service-configuration)
+- [Error Handling](#error-handling)
+- [API Routes](#api-routes)
+
+## Role-Based Access Control
+
+The authentication system implements a hierarchical role-based access control (RBAC) system with comprehensive role validation across all service layers.
+
+### Role Constants Implementation
+
+**Definition Location**: `src/models/user.model.ts` (Lines 6-11)
+
+```typescript
+export enum UserRole {
+  ADMIN = 'admin',        // Highest privilege level
+  SUPERVISOR = 'supervisor', // Mid-level privilege  
+  ENDUSER = 'enduser',    // Base level access
+  USER = 'user'           // Alias for ENDUSER
+}
+```
+
+### Role Implementation Architecture
+
+```mermaid
+graph TD
+    A[JWT Token with Role] --> B[Auth Middleware]
+    B --> |Extract Role| C[Role Validation]
+    C --> |Check Permissions| D{Role Authorization}
+    
+    D --> |ADMIN| E[Full System Access]
+    D --> |SUPERVISOR| F[User Management Access]
+    D --> |ENDUSER/USER| G[Standard User Access]
+    D --> |Invalid/Missing| H[Access Denied]
+    
+    E --> I[Admin Routes Accessible]
+    F --> J[Limited Admin Features]
+    G --> K[Protected Routes Only]
+    H --> L[Authentication Required Response]
+    
+    subgraph "Role Hierarchy"
+        M[ADMIN - 'admin']
+        N[SUPERVISOR - 'supervisor']
+        O[ENDUSER - 'enduser']
+        P[USER - 'user' (alias)]
+        M --> N
+        N --> O
+        O --> P
+    end
+```
+
+### Role Service Integration Points
+
+**Code Locations with Role Implementation:**
+
+1. **User Model** (`src/models/user.model.ts`)
+   - Lines 6-11: UserRole enum definition
+   - Role property in User interface/model
+
+2. **Authentication Middleware** (`src/auth/auth.middleware.ts`)
+   - Lines 89-116: Role-based route protection
+   - JWT token role extraction and validation
+
+3. **Admin Routes** (`src/routes/admin.routes.ts`)
+   - Role-specific endpoint access control
+   - Admin privilege validation
+
+4. **User Creation Service** (`quickCreateAdminPy/create_users.py`)
+   - Lines 18-50: Role assignment during user creation
+   - Line 156: Admin user creation with role validation
+
+### Role Validation Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Middleware
+    participant JWT Service
+    participant Route Handler
+    participant Database
+    
+    Client->>Middleware: Request + JWT Token
+    Middleware->>JWT Service: Validate Token
+    JWT Service->>Middleware: Token Payload (includes role)
+    Middleware->>Middleware: Extract User Role
+    Middleware->>Route Handler: Authorized Request + Role
+    Route Handler->>Database: Role-Based Query/Operation
+    Database->>Route Handler: Result
+    Route Handler->>Client: Response (Success/Access Denied)
+```
 
 ## System Architecture
 
@@ -95,9 +195,36 @@ graph TD
 ### Middleware
 
 1. **Auth Middleware** (`auth.middleware.ts`)
+   - **Location**: Lines 89-116 contain role-based access control implementation
    - Authenticates requests using JWT tokens
-   - Provides role-based access control
+   - Provides role-based access control with hierarchical permissions
    - Supports optional authentication
+   - **Role Implementation**: Extracts user role from JWT payload and validates against required permissions
+
+**Key Role Validation Code** (`src/auth/auth.middleware.ts`, Lines 89-116):
+```typescript
+// Role-based middleware implementation
+const requireRole = (requiredRole: UserRole) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
+    // Role hierarchy validation
+    const userRole = req.user.role;
+    if (!hasRequiredRole(userRole, requiredRole)) {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+};
+```
+
+**Role-Based Route Protection Examples**:
+- **Admin Routes**: `router.use(requireAuth, requireRole(UserRole.ADMIN))`
+- **Supervisor Routes**: `router.use(requireAuth, requireRole(UserRole.SUPERVISOR))`
+- **General Protected**: `router.use(requireAuth)` (any authenticated user)
 
 ### Routes
 
