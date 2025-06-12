@@ -601,6 +601,77 @@ Authorization: Bearer <access_token>
 - 403: Admin access required
 - 500: Failed to fetch users
 
+### Get User by Email
+
+```
+GET /api/admin/users/by-email/:email
+```
+
+**Description**: Returns user information for a specific email address. This endpoint is optimized for external integrations and Python scripts that need to look up users by email without fetching all users.
+
+**Access Level**: Admin Only (`UserRole.ADMIN`)
+
+**Role-Based Access**:
+- ✅ **ADMIN**: Full access to user lookup
+- ❌ **SUPERVISOR**: Access denied
+- ❌ **ENDUSER/USER**: Access denied
+
+**Implementation Status**: ✅ **IMPLEMENTED** - Available in current API version
+
+**Headers**:
+
+```
+Authorization: Bearer <access_token>
+```
+
+**URL Parameters**:
+
+- `email`: The email address to search for (URL encoded)
+
+**Response (200 OK)**:
+
+```json
+{
+  "user": {
+    "_id": "string",
+    "username": "string",
+    "email": "string",
+    "isVerified": boolean,
+    "role": "string",
+    "createdAt": "date",
+    "updatedAt": "date"
+  }
+}
+```
+
+**Possible Errors**:
+
+- 400: Email is required
+- 401: Authentication required
+- 403: Admin access required
+- 404: User not found
+- 500: Failed to fetch user
+
+**Usage Examples**:
+
+```bash
+# Example URL (email should be URL encoded)
+GET /api/admin/users/by-email/user%40example.com
+
+# Python usage
+response = await client.get(
+    f"{auth_url}/api/admin/users/by-email/{urllib.parse.quote(email)}",
+    headers={"Authorization": f"Bearer {admin_token}"}
+)
+```
+
+**Notes**:
+
+- Email parameter in URL must be properly URL encoded
+- Returns 404 if user with specified email doesn't exist
+- Optimized for single user lookup vs fetching all users
+- Ideal for external API integrations and automation scripts
+
 ### Create a New User
 
 ```

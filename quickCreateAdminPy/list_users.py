@@ -217,7 +217,7 @@ def display_users(users):
             '✓' if user.get('isVerified', False) else '✗',
             created_at,
             last_login,
-            user_id[:10] + '...' if len(user_id) > 10 else user_id
+            user_id
         ])
     
     # Print the table
