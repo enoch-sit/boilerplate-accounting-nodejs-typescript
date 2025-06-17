@@ -1,6 +1,6 @@
 // src/routes/index.ts
 import { Router, Request, Response } from 'express';
-import { authenticate, requireAdmin, requireSupervisor } from '../auth/auth.middleware';
+import { authenticate, isAdmin, requireAdmin, requireSupervisor } from '../auth/auth.middleware'; // Added isAdmin
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
 import { passwordService } from '../services/password.service';
@@ -403,6 +403,40 @@ adminRouter.get('/users', authenticate, requireAdmin, async (req: Request, res: 
   } catch (error) {
     logger.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Get user by ID (Admin only)
+adminRouter.get('/users/:userId', authenticate, isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(userId).select('-password'); // Exclude password
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Normalize the response to match the Python server's expected format
+    const userData = {
+        user_id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        is_verified: user.isVerified,
+        created_at: user.createdAt,
+        updated_at: user.updatedAt
+    };
+
+    res.status(200).json({ user: userData }); // Wrapped in 'user' key
+
+  } catch (error: any) {
+    logger.error(`Error fetching user by ID: ${error.message}`);
+    res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 

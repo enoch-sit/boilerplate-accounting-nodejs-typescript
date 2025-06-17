@@ -60,6 +60,18 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 };
 
 /**
+ * Authorization middleware to check if the user is an admin
+ */
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (req.user && req.user.role === UserRole.ADMIN) {
+    next();
+  } else {
+    logger.warn(`Forbidden: Admin access required for user ${req.user?.userId} with role ${req.user?.role} at ${req.originalUrl}`);
+    return res.status(403).json({ error: 'Forbidden: Admin access required' });
+  }
+};
+
+/**
  * Check if user is authenticated but don't require authentication
  */
 export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {

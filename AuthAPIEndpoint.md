@@ -601,6 +601,62 @@ Authorization: Bearer <access_token>
 - 403: Admin access required
 - 500: Failed to fetch users
 
+### Get User by ID
+
+```http
+GET /api/admin/users/:userId
+```
+
+**Description**: Returns user information for a specific user ID.
+
+**Access Level**: Admin Only (`UserRole.ADMIN`)
+
+**Role-Based Access**:
+- ✅ **ADMIN**: Full access to user lookup
+- ❌ **SUPERVISOR**: Access denied
+- ❌ **ENDUSER/USER**: Access denied
+
+**Implementation Status**: ✅ **IMPLEMENTED** - Available in current API version
+
+**Headers**:
+
+```
+Authorization: Bearer <access_token>
+```
+
+**URL Parameters**:
+
+- `userId`: The ID of the user to search for
+
+**Response (200 OK)**:
+
+```json
+{
+  "user": {
+    "user_id": "string",
+    "username": "string",
+    "email": "string",
+    "role": "string",
+    "is_verified": boolean,
+    "created_at": "date",
+    "updated_at": "date"
+  }
+}
+```
+
+**Possible Errors**:
+
+- 400: Invalid user ID format
+- 401: Authentication required
+- 403: Admin access required
+- 404: User not found
+- 500: Failed to fetch user
+
+**Notes**:
+
+- Returns 404 if user with specified ID doesn't exist.
+- Response format is normalized for consistency with external services.
+
 ### Get User by Email
 
 ```
