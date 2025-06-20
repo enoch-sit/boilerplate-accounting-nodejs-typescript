@@ -214,14 +214,15 @@ def display_users(users):
             user.get('username', 'N/A'),
             user.get('email', 'N/A'),
             user.get('role', 'N/A'),
-            '✓' if user.get('isVerified', False) else '✗',
+            '✓' if user.get('isVerified', False) else '✗', # This is the "Active" column
+            '✓' if user.get('isVerified', False) else '✗', # This is the new "Verified" column
             created_at,
             last_login,
             user_id
         ])
     
     # Print the table
-    headers = ["Username", "Email", "Role", "Verified", "Created At", "Last Login", "User ID"]
+    headers = ["Username", "Email", "Role", "Active", "Verified", "Created At", "Last Login", "User ID"]
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
     
     # Print summary

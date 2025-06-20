@@ -1,6 +1,6 @@
 // src/routes/index.ts
 import { Router, Request, Response } from 'express';
-import { authenticate, isAdmin, requireAdmin, requireSupervisor } from '../auth/auth.middleware'; // Added isAdmin
+import { authenticate, isAdmin, requireAdmin, requireSupervisor, optionalAuth } from '../auth/auth.middleware'; // Added isAdmin
 import { User, UserRole } from '../models/user.model';
 import { authService } from '../auth/auth.service';
 import { passwordService } from '../services/password.service';
@@ -271,6 +271,46 @@ authRouter.post('/reset-password', async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error(`Reset password error: ${error.message}`);
     res.status(500).json({ error: 'Password reset failed' });
+  }
+});
+
+// Check user existence and activity (called by external services like Python script)
+authRouter.get('/users/:userId', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Base response for all authenticated or unauthenticated requests
+    const responseData: any = {
+      _id: user._id,
+      username: user.username,
+      active: user.isVerified, // 'active' field for the Python script
+      deleted: false           // 'deleted' field for the Python script (false as user is found)
+    };
+
+    // If an admin is making the request, add more details
+    if (req.user && req.user.role === UserRole.ADMIN) {
+      responseData.email = user.email;
+      responseData.role = user.role;
+      responseData.isVerified = user.isVerified; // Include original isVerified as well
+      responseData.createdAt = user.createdAt;
+      responseData.updatedAt = user.updatedAt;
+    }
+
+    res.status(200).json(responseData);
+
+  } catch (error: any) {
+    logger.error(`Error checking user existence: ${error.message}`);
+    res.status(500).json({ error: 'Failed to check user existence' });
   }
 });
 
