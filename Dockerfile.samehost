@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install build dependencies for native modules (keeping these for any other potential native modules)
+RUN apk add --no-cache python3 make g++ 
+
+# Install dependencies first (for better caching)
+COPY package*.json ./
+RUN npm install
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the TypeScript code
+RUN npm run build
+
+# Expose the port the app runs on
+EXPOSE 3000
+
+# Start the production server
+CMD ["npm", "run", "start"]
