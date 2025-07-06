@@ -21,6 +21,7 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
 ### Setup Docker Environment
 
 1. **Start the Development Environment**:
+
    ```powershell
    # Start the whole stack (auth service, MongoDB, and MailHog)
    docker-compose -f docker-compose.dev.yml up
@@ -30,6 +31,7 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
    ```
 
 2. **Verify Services are Running**:
+
    ```powershell
    # Check all containers
    docker ps
@@ -38,14 +40,15 @@ This guide provides detailed instructions for testing the TypeScript Authenticat
    ```
 
 3. **Access Service Endpoints**:
-   - API Endpoint: http://localhost:3000/api
-   - MailHog UI: http://localhost:8025
+   - API Endpoint: <http://localhost:3000/api>
+   - MailHog UI: <http://localhost:8025>
 
 ### Force Rebuilding Docker Containers
 
 When you need to ensure your container has the latest dependencies or configuration changes, you may need to force rebuild:
 
 1. **Rebuild All Services**:
+
    ```powershell
    # Force rebuild and start development containers
    docker-compose -f docker-compose.dev.yml up --build
@@ -55,6 +58,7 @@ When you need to ensure your container has the latest dependencies or configurat
    ```
 
 2. **Rebuild a Specific Service**:
+
    ```powershell
    # Rebuild only the auth-service
    docker-compose -f docker-compose.dev.yml build auth-service
@@ -64,6 +68,7 @@ When you need to ensure your container has the latest dependencies or configurat
    ```
 
 3. **Rebuild and Run Test Service**:
+
    ```powershell
    # Rebuild and run the test service
    docker-compose -f docker-compose.dev.yml run --rm --build auth-test
@@ -73,6 +78,7 @@ When you need to ensure your container has the latest dependencies or configurat
    ```
 
 4. **Complete Clean Rebuild**:
+
    ```powershell
    # Stop and remove all containers, networks, and volumes
    docker-compose -f docker-compose.dev.yml down -v
@@ -115,11 +121,12 @@ MailHog provides a web interface to inspect emails sent by the application durin
 ### Using MailHog UI
 
 1. **Access MailHog Web Interface**:
-   - Open http://localhost:8025 in your browser
+   - Open <http://localhost:8025> in your browser
 
 2. **Register a New User**:
    - Send a POST request to `/api/auth/signup` with valid credentials
    - Example:
+
      ```json
      {
        "username": "testuser",
@@ -149,6 +156,7 @@ MailHog provides a web interface to inspect emails sent by the application durin
 2. **PowerShell or cURL**:
    - For ad-hoc testing and scripting
    - Example:
+
      ```powershell
      Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/signup' -Method Post -ContentType 'application/json' -Body '{"username":"testuser","email":"test@example.com","password":"Password123!"}'
      ```
@@ -158,6 +166,7 @@ MailHog provides a web interface to inspect emails sent by the application durin
 ### Running Jest Tests
 
 1. **Run All Tests in Docker**:
+
    ```powershell
    # Run tests in the auth-test service
    docker-compose -f docker-compose.dev.yml run --rm auth-test
@@ -167,6 +176,7 @@ MailHog provides a web interface to inspect emails sent by the application durin
    ```
 
 2. **Run Specific Tests**:
+
    ```powershell
    docker-compose -f docker-compose.dev.yml run --rm auth-test npm test -- -t "Role-Based Access Control Tests"
    ```
@@ -181,6 +191,7 @@ MailHog provides a web interface to inspect emails sent by the application durin
 For comprehensive testing, use the built-in test pipeline:
 
 1. **Run Complete Test Pipeline**:
+
    ```powershell
    # Make sure you have PowerShell execution policy set correctly
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -190,6 +201,7 @@ For comprehensive testing, use the built-in test pipeline:
    ```
 
 2. **Run Specific Test Segments**:
+
    ```powershell
    # Run only unit tests
    .\tests\test-pipeline.ps1 -UnitTestsOnly
@@ -205,6 +217,7 @@ For comprehensive testing, use the built-in test pipeline:
    - This allows for faster testing without needing email verification
 
 2. **Using Auto-Verify Test Script**:
+
    ```powershell
    # Run automated verification tests
    .\tests\auto-verify-tests.ps1
@@ -215,6 +228,7 @@ For comprehensive testing, use the built-in test pipeline:
 ### Setting Up Production Test Environment
 
 1. **Create .env.production File**:
+
    ```dotenv
    NODE_ENV=production
    MONGO_URI=mongodb://username:password@mongodb:27017/auth_db
@@ -229,13 +243,14 @@ For comprehensive testing, use the built-in test pipeline:
    EMAIL_FROM=noreply@your-domain.com
    PASSWORD_RESET_EXPIRES_IN=1h
    VERIFICATION_CODE_EXPIRES_IN=15m
-   FRONTEND_URL=https://your-domain.com
+   HOST_URL=https://your-domain.com
    CORS_ORIGIN=https://your-domain.com
    PORT=3000
    LOG_LEVEL=info
    ```
 
 2. **Create Environment Variables File for Docker**:
+
    ```bash
    # Create .env file for docker-compose.prod.yml
    echo "JWT_ACCESS_SECRET=your_secure_access_secret" > .env
@@ -245,6 +260,7 @@ For comprehensive testing, use the built-in test pipeline:
    ```
 
 3. **Start Production Environment**:
+
    ```bash
    docker-compose -f docker-compose.prod.yml up -d
    ```
@@ -252,11 +268,13 @@ For comprehensive testing, use the built-in test pipeline:
 ### Testing Production Deployment
 
 1. **Health Check**:
+
    ```bash
    curl http://localhost:3000/health
    ```
 
 2. **Smoke Tests**:
+
    ```bash
    # Create a user
    curl -X POST http://localhost:3000/api/auth/signup \
@@ -293,6 +311,7 @@ The system includes a new endpoint for administrators to create users with speci
 ### Manual Testing with Admin User Creation
 
 1. **Authenticate as an Admin**:
+
    ```powershell
    # Login with an admin account
    $adminLoginResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/login' -Method Post -ContentType 'application/json' -Body '{"username":"admin","password":"AdminPassword123!"}'
@@ -302,6 +321,7 @@ The system includes a new endpoint for administrators to create users with speci
    ```
 
 2. **Create a Regular User as Admin**:
+
    ```powershell
    # Create a new regular user
    $createUserResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Post -Headers @{
@@ -319,6 +339,7 @@ The system includes a new endpoint for administrators to create users with speci
    ```
 
 3. **Create a Supervisor User as Admin**:
+
    ```powershell
    # Create a new supervisor user
    $createSupervisorResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Post -Headers @{
@@ -336,6 +357,7 @@ The system includes a new endpoint for administrators to create users with speci
    ```
 
 4. **Verify Created Users**:
+
    ```powershell
    # List all users
    $usersResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
@@ -427,7 +449,7 @@ When testing the admin functionality of the system, you'll need to access endpoi
 #### Setting Up an Admin User for Testing
 
 1. **Initial Admin User Creation**:
-   
+
    There's no initial admin user seeded in the database by default. For testing, you need to create one:
 
    ```bash
@@ -442,7 +464,7 @@ When testing the admin functionality of the system, you'll need to access endpoi
    ```
 
 2. **Convert the User to Admin**:
-   
+
    You must update the user's role directly in the database. This is by design - even admin users cannot create other admin users through the API to prevent privilege escalation.
 
    ```bash
@@ -516,6 +538,7 @@ python deploy_test.py --url http://localhost:3000 --admin-test true
 The role-based system works through:
 
 1. **Role Storage**: Roles are stored in the User document in MongoDB
+
    ```javascript
    // In user.model.ts:
    export enum UserRole {
@@ -527,12 +550,14 @@ The role-based system works through:
    ```
 
 2. **JWT Token Inclusion**: When tokens are generated, the role is included:
+
    ```javascript
    // In token.service.ts:
    const payload = { sub: userId, username, type: 'access', role };
    ```
 
 3. **Middleware Protection**: Routes are protected by role-checking middleware:
+
    ```javascript
    // In auth.middleware.ts
    export const requireAdmin = (req, res, next) => {
@@ -550,15 +575,18 @@ Understanding these components helps in debugging authorization issues during te
 If you encounter issues with admin authentication during testing:
 
 1. **Database Role Verification**:
+
    ```bash
    docker exec -it auth-mongodb mongosh
    use auth_db
    db.users.find({ username: "admin" }).pretty()
    ```
+
    Ensure that `role` is set to "admin" and `isVerified` is `true`.
 
 2. **API Response Debugging**:
    Add verbose logging to your test requests:
+
    ```bash
    curl -v -X POST http://localhost:3000/api/auth/login \
      -H "Content-Type: application/json" \
@@ -567,10 +595,12 @@ If you encounter issues with admin authentication during testing:
 
 3. **Token Validation**:
    Decode a JWT token to check role inclusion:
+
    ```bash
    npm install -g jwt-cli
    jwt decode YOUR_TOKEN
    ```
+
    Verify that the payload contains `"role": "admin"`.
 
 Remember that any change to the role system requires updates to the role enumeration, middleware, and potentially the database schema to ensure consistent behavior.
@@ -584,6 +614,7 @@ The authentication system now includes endpoints for admin users to delete indiv
 First, create some test users that you can delete:
 
 1. **Create Test Users to Delete**:
+
    ```powershell
    # Login as admin
    $adminLoginResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/login' -Method Post -ContentType 'application/json' -Body '{"username":"admin","password":"AdminPassword123!"}'
@@ -607,6 +638,7 @@ First, create some test users that you can delete:
    ```
 
 2. **Delete a Single User**:
+
    ```powershell
    # Delete the test user
    $deleteResponse = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/users/$userIdToDelete" -Method Delete -Headers @{
@@ -618,6 +650,7 @@ First, create some test users that you can delete:
    ```
 
 3. **Verify Deletion**:
+
    ```powershell
    # List all users to confirm deletion
    $usersAfterDeletion = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
@@ -639,6 +672,7 @@ First, create some test users that you can delete:
 The user deletion API includes important security restrictions that should be tested:
 
 1. **Attempt to Delete Self (Should Fail)**:
+
    ```powershell
    # Get admin's own user ID
    $adminProfile = Invoke-RestMethod -Uri 'http://localhost:3000/api/protected/profile' -Method Get -Headers @{
@@ -659,6 +693,7 @@ The user deletion API includes important security restrictions that should be te
    ```
 
 2. **Attempt to Delete Another Admin (Should Fail)**:
+
    ```powershell
    # First create another admin directly in the database
    # This requires direct database access as the API doesn't allow creating admins
@@ -680,6 +715,7 @@ The user deletion API includes important security restrictions that should be te
 The bulk deletion endpoint is powerful and should be tested carefully:
 
 1. **Create Multiple Test Users**:
+
    ```powershell
    # Create several test users
    for ($i = 1; $i -le 5; $i++) {
@@ -703,6 +739,7 @@ The bulk deletion endpoint is powerful and should be tested carefully:
    ```
 
 2. **Bulk Delete with Confirmation**:
+
    ```powershell
    # Perform bulk deletion with preserveAdmins=true (default)
    $bulkDeleteResponse = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Delete -Headers @{
@@ -716,6 +753,7 @@ The bulk deletion endpoint is powerful and should be tested carefully:
    ```
 
 3. **Verify Bulk Deletion**:
+
    ```powershell
    # Check how many users exist after bulk deletion
    $usersAfter = Invoke-RestMethod -Uri 'http://localhost:3000/api/admin/users' -Method Get -Headers @{
@@ -787,6 +825,7 @@ curl -X DELETE http://localhost:3000/api/admin/users \
 3. **Tokens Remaining After User Delete**:
    - When a user is deleted, their refresh tokens should be automatically cleaned up
    - If you experience token-related issues after deletion, check the MongoDB Token collection:
+
      ```bash
      docker exec -it auth-mongodb mongosh
      use auth_db
@@ -807,7 +846,7 @@ When running the authentication system in Docker containers across different arc
 
 1. **Symptoms of Native Module Problems**:
    - Connection errors when trying to access API endpoints
-   - Errors in logs containing messages like "Exec format error" 
+   - Errors in logs containing messages like "Exec format error"
    - Issues appearing after changing development machines or Docker environments
 
 2. **Particularly Problematic Modules**:
@@ -823,6 +862,7 @@ When running the authentication system in Docker containers across different arc
 
 2. **Ensure Proper Build Environment**:
    - Include proper build tools in your Dockerfile:
+
      ```dockerfile
      # Install build essentials
      RUN apk add --no-cache python3 make g++ 
@@ -830,6 +870,7 @@ When running the authentication system in Docker containers across different arc
 
 3. **Rebuild Native Modules**:
    - For some modules, explicitly rebuilding can help:
+
      ```dockerfile
      RUN npm rebuild <module-name> --build-from-source
      ```
@@ -841,6 +882,7 @@ When running the authentication system in Docker containers across different arc
    - Use Docker's multi-platform build capabilities for production images
 
 2. **Local Development Checks**:
+
    ```powershell
    # Check container architecture
    docker exec auth-service-dev uname -m
@@ -913,6 +955,7 @@ For a detailed case study on solving bcrypt architecture issues in this project,
    - Ensure user credentials in tests are valid
 
 For any issues not covered here, check application logs:
+
 ```powershell
 # View logs for auth service
 docker-compose -f docker-compose.dev.yml logs auth-service
@@ -1040,7 +1083,7 @@ docker logs auth-service-dev | grep "MongoDB"
 
 If the "Email Verification" test fails:
 
-1. **Check MailHog UI**: Visit http://localhost:8025 to see if verification emails are being sent
+1. **Check MailHog UI**: Visit <http://localhost:8025> to see if verification emails are being sent
 2. **Verify Token Generation**: Look for logs about verification token creation
 3. **Database Connectivity**: Ensure the Verification model can access MongoDB
 

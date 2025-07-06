@@ -29,7 +29,7 @@ export class EmailService {
     // Get the email transporter configured in email.config.ts
     const transporter = getEmailTransporter();
     // Set the frontend URL, defaulting to localhost if not specified in environment variables
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const hostUrl = process.env.HOST_URL || 'http://localhost:3000';
       
     // Configure the email options
     const mailOptions = {
@@ -84,9 +84,9 @@ export class EmailService {
     // Get the email transporter configured in email.config.ts
     const transporter = getEmailTransporter();
     // Set the frontend URL, defaulting to localhost if not specified in environment variables
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const hostUrl = process.env.HOST_URL || 'http://localhost:3000';
     // Construct the password reset link
-    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+    const resetLink = `${hostUrl}/reset-password?token=${resetToken}`;
       
     // Configure the email options
     const mailOptions = {
@@ -143,9 +143,9 @@ export class EmailService {
       // Get the email transporter configured in email.config.ts
       const transporter = getEmailTransporter();
       // Set the frontend URL, defaulting to localhost if not specified in environment variables
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const hostUrl = process.env.HOST_URL || 'http://localhost:3000';
       // Construct the login link
-      const loginLink = `${frontendUrl}/login`;
+      const loginLink = `${hostUrl}/login`;
         
       // Configure the email options
       const mailOptions = {

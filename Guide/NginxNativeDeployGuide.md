@@ -211,7 +211,7 @@ EMAIL_PASS=your_email_password
 EMAIL_FROM=noreply@ai.example.ai
 PASSWORD_RESET_EXPIRES_IN=1h
 VERIFICATION_CODE_EXPIRES_IN=15m
-FRONTEND_URL=https://ai.example.ai
+HOST_URL=https://ai.example.ai
 CORS_ORIGIN=https://ai.example.ai
 LOG_LEVEL=error
 ```
@@ -541,6 +541,7 @@ sudo apt install -y htop iotop
 ```
 
 For more comprehensive monitoring, consider setting up:
+
 - Prometheus and Grafana for metrics
 - Graylog or ELK Stack for log aggregation
 
@@ -581,4 +582,4 @@ http {
    - Automate database backups
    - Store backups securely off-server
 
-By following this deployment guide, you will have a secure, production-ready authentication system running on your Linux server with Nginx as a reverse proxy, accessible at https://ai.example.ai.
+By following this deployment guide, you will have a secure, production-ready authentication system running on your Linux server with Nginx as a reverse proxy, accessible at <https://ai.example.ai>.

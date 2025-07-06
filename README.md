@@ -109,7 +109,7 @@ Each higher role inherits all permissions from the roles below it.
 
    Create a `.env.development` file in the root directory:
 
-   ``` 
+   ```
    PORT=3000
    NODE_ENV=development
    MONGO_URI=mongodb://localhost:27017/auth_db
@@ -124,7 +124,7 @@ Each higher role inherits all permissions from the roles below it.
    EMAIL_FROM=noreply@example.com
    PASSWORD_RESET_EXPIRES_IN=1h
    VERIFICATION_CODE_EXPIRES_IN=15m
-   FRONTEND_URL=http://localhost:3000
+   HOST_URL=http://localhost:3000
    CORS_ORIGIN=http://localhost:3000
    LOG_LEVEL=info
    ```

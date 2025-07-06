@@ -153,7 +153,7 @@ If you prefer not to use Docker, you can set up the project locally:
    EMAIL_FROM=noreply@example.com
    PASSWORD_RESET_EXPIRES_IN=1h
    VERIFICATION_CODE_EXPIRES_IN=15m
-   FRONTEND_URL=http://localhost:3000
+   HOST_URL=http://localhost:3000
    CORS_ORIGIN=http://localhost:3000
    LOG_LEVEL=info
    ```

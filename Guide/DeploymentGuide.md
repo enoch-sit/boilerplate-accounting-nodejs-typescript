@@ -82,7 +82,7 @@ If you prefer to develop without Docker:
    JWT_REFRESH_EXPIRES_IN=7d
    VERIFICATION_CODE_EXPIRES_IN=15m
    PASSWORD_RESET_EXPIRES_IN=1h
-   FRONTEND_URL=http://localhost:3000
+   HOST_URL=http://localhost:3000
    EMAIL_FROM=noreply@example.com
    CORS_ORIGIN=http://localhost:3000
    LOG_LEVEL=info
@@ -147,7 +147,7 @@ Both development and production environments use environment variables for confi
 | `EMAIL_FROM` | From address for emails | `noreply@example.com` |
 | `VERIFICATION_CODE_EXPIRES_IN` | Email verification expiration | `15m` |
 | `PASSWORD_RESET_EXPIRES_IN` | Password reset token expiration | `1h` |
-| `FRONTEND_URL` | Frontend application URL | `https://yourdomain.com` |
+| `HOST_URL` | Frontend application URL | `https://yourdomain.com` |
 | `CORS_ORIGIN` | CORS allowed origins | `https://yourdomain.com` |
 | `LOG_LEVEL` | Logging level | `info` |
 
@@ -324,6 +324,7 @@ For example, if a report shows the "Refresh Token" test failing, but it was pass
 ### Default Admin Credentials
 
 The application is designed with role-based access control, with admin users having the highest level of privileges. The default admin credentials are:
+
 - Username: `admin`
 - Password: `AdminPassword123!`
 
@@ -338,6 +339,7 @@ There are several ways to create an admin user:
 This is the most reliable method when you're first setting up the system:
 
 1. Create a regular user through the signup API:
+
    ```bash
    curl -X POST http://localhost:3000/api/auth/signup \
      -H "Content-Type: application/json" \
@@ -345,16 +347,19 @@ This is the most reliable method when you're first setting up the system:
    ```
 
 2. Connect to the MongoDB instance:
+
    ```bash
    docker exec -it auth-mongodb mongosh
    ```
 
 3. Switch to the auth database:
+
    ```
    use auth_db
    ```
 
 4. Update the user's role to admin and mark it as verified:
+
    ```
    db.users.updateOne(
      { username: "admin" },
@@ -369,6 +374,7 @@ This is the most reliable method when you're first setting up the system:
 If an admin already exists, they can create other users (including admin users):
 
 1. Log in as an existing admin user:
+
    ```bash
    curl -X POST http://localhost:3000/api/auth/login \
      -H "Content-Type: application/json" \
@@ -376,6 +382,7 @@ If an admin already exists, they can create other users (including admin users):
    ```
 
 2. Use the returned token to create a supervisor user:
+
    ```bash
    curl -X POST http://localhost:3000/api/admin/users \
      -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
@@ -471,6 +478,7 @@ Each higher role inherits all permissions from the roles below it. This hierarch
 The role-based authorization system works through these key components:
 
 1. **User Model**: Stores the user's role in the `role` field.
+
    ```typescript
    // src/models/user.model.ts
    export enum UserRole {
@@ -481,6 +489,7 @@ The role-based authorization system works through these key components:
    ```
 
 2. **Token Service**: Includes the role in JWT tokens
+
    ```typescript
    // Role is included in the payload
    const payload: TokenPayload = { 
@@ -492,6 +501,7 @@ The role-based authorization system works through these key components:
    ```
 
 3. **Auth Middleware**: Verifies the role from the token and restricts access
+
    ```typescript
    // Example: Admin check middleware
    export const requireAdmin = (req, res, next) => {
@@ -503,6 +513,7 @@ The role-based authorization system works through these key components:
    ```
 
 4. **Route Protection**: API endpoints are protected with the appropriate middleware
+
    ```typescript
    // Example: Admin-only route
    router.get('/users', authenticate, requireAdmin, userController.getAllUsers);
