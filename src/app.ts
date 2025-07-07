@@ -13,6 +13,8 @@ import { logger } from './utils/logger';
 // Load the appropriate .env file based on environment
 if (process.env.NODE_ENV === 'production') {
   require('dotenv').config({ path: '.env.production' });
+} else if (process.env.NODE_ENV === 'samehost') {
+  require('dotenv').config({ path: '.env.samehost' });
 } else {
   require('dotenv').config({ path: '.env.development' });
 }
