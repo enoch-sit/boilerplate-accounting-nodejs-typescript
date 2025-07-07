@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Main application service for development
   auth-service:
@@ -9,9 +7,6 @@ services:
     container_name: auth-service-dev
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
     environment:
       - NODE_ENV=samehost
       - MONGO_URI=mongodb://mongodb:27017/auth_db
