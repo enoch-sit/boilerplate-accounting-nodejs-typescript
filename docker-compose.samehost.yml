@@ -13,39 +13,39 @@ services:
       - .:/app
       - /app/node_modules
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=samehost
       - MONGO_URI=mongodb://mongodb:27017/auth_db
-      - JWT_ACCESS_SECRET=dev_access_secret_key_change_this_in_production
-      - JWT_REFRESH_SECRET=dev_refresh_secret_key_change_this_in_production
-      - JWT_ACCESS_EXPIRES_IN=15m
-      - JWT_REFRESH_EXPIRES_IN=7d
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
       - EMAIL_HOST=mailhog
       - EMAIL_PORT=1025
-      - EMAIL_USER=test@example.com
-      - EMAIL_PASS=password
-      - EMAIL_FROM=noreply@example.com
-      - PASSWORD_RESET_EXPIRES_IN=1h
-      - VERIFICATION_CODE_EXPIRES_IN=15m
-      - HOST_URL=http://localhost:3000
-      - CORS_ORIGIN=http://localhost:5173
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - PASSWORD_RESET_EXPIRES_IN=${PASSWORD_RESET_EXPIRES_IN}
+      - VERIFICATION_CODE_EXPIRES_IN=${VERIFICATION_CODE_EXPIRES_IN}
+      - HOST_URL=${HOST_URL}
+      - CORS_ORIGIN=${CORS_ORIGIN}
       - PORT=3000
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL}
     depends_on:
       - mongodb
       - mailhog
     networks:
       - auth-network
     restart: unless-stopped
-    command: npm run dev
+    command: npm run start
 
-  # MongoDB service for local development
+  # MongoDB service for samehost development
   mongodb:
     image: mongo:6.0
-    container_name: auth-mongodb
+    container_name: auth-mongodb-samehost
     ports:
       - "27017:27017"
     volumes:
-      - mongodb-data:/data/db
+      - mongodb-samehost-data:/data/db
     environment:
       - MONGO_INITDB_DATABASE=auth_db
     networks:
@@ -60,48 +60,20 @@ services:
   # MailHog for email testing
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: auth-mailhog
+    container_name: auth-mailhog-samehost
     ports:
       - "1025:1025"  # SMTP server port
       - "8025:8025"  # Web UI port
     networks:
       - auth-network
     restart: unless-stopped
-# Test service that can run test suites
-  # auth-test:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.dev
-  #   container_name: auth-test
-  #   volumes:
-  #     - .:/app
-  #     - /app/node_modules
-  #   environment:
-  #     - NODE_ENV=test
-  #     - MONGO_URI=mongodb://mongodb:27017/auth_test_db
-  #     - JWT_ACCESS_SECRET=test_access_secret_key
-  #     - JWT_REFRESH_SECRET=test_refresh_secret_key
-  #     - JWT_ACCESS_EXPIRES_IN=15m
-  #     - JWT_REFRESH_EXPIRES_IN=7d
-  #     - EMAIL_HOST=mailhog
-  #     - EMAIL_PORT=1025
-  #     - EMAIL_USER=test@example.com
-  #     - EMAIL_PASS=password
-  #     - EMAIL_FROM=noreply@example.com
-  #     - MAILHOG_API=http://mailhog:8025/api/v1
-  #     - API_URL=http://auth-service:3000/api
-  #     - TEST_USER_EMAIL=test@example.com
-  #     - TEST_USER_PASSWORD=TestPassword123!
-  #     - BYPASS_EMAIL_VERIFICATION=true
-  #   depends_on:
-  #     - mongodb
-  #     - mailhog
-  #   networks:
-  #     - auth-network
-  #   command: npm test
 networks:
   auth-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+          gateway: 10.10.10.1
 
 volumes:
-  mongodb-data:
+  mongodb-samehost-data:
