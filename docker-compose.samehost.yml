@@ -15,12 +15,12 @@ services:
     environment:
       - NODE_ENV=development
       - MONGO_URI=mongodb://mongodb:27017/auth_db
-      - JWT_ACCESS_SECRET=dev_access_secret_key_change_this_in_production
-      - JWT_REFRESH_SECRET=dev_refresh_secret_key_change_this_in_production
-      - JWT_ACCESS_EXPIRES_IN=15m
-      - JWT_REFRESH_EXPIRES_IN=7d
-      - EMAIL_HOST=mailhog
-      - EMAIL_PORT=1025
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=test@example.com
       - EMAIL_PASS=password
       - EMAIL_FROM=noreply@example.com
