@@ -229,7 +229,7 @@ def test_token(token):
         
         # Try to access a protected endpoint
         response = requests.get(
-            f"{API_BASE_URL}/api/auth/me",
+            f"{API_BASE_URL}/api/profile",
             headers=headers,
             timeout=10
         )
@@ -314,7 +314,7 @@ def main():
         
         # Show curl example
         print("\n🌐 Example usage with curl:")
-        print(f'curl -H "Authorization: Bearer {token}" {API_BASE_URL}/api/auth/me')
+        print(f'curl -H "Authorization: Bearer {token}" {API_BASE_URL}/api/profile')
         
     else:
         print("❌ Failed to retrieve token")
