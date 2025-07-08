@@ -50,7 +50,7 @@ REGULAR_USERS = [
         "password": f"User{i:02d}@aidcec",
         "role": "enduser",
     }
-    for i in range(1, 101)
+    for i in range(90, 101)
 ]
 
 # Combine all users for testing

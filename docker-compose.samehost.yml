@@ -1,74 +1,97 @@
+# Docker Compose configuration for a "samehost" development environment.
+# This setup is designed for running all services on a single Docker host,
+# facilitating easy local development and testing.
 services:
-  # Main application service for development
+  # Defines the main application service (authentication service).
   auth-service:
+    # Specifies the build context and Dockerfile for the service.
     build:
-      context: .
-      dockerfile: Dockerfile.samehost
-    container_name: auth-service-dev
+      context: .  # Use the current directory as the build context.
+      dockerfile: Dockerfile.samehost  # Use the specific Dockerfile for this environment.
+    container_name: auth-service-dev  # Assigns a custom name to the container for easy reference.
+    # Maps port 3000 on the host to port 3000 in the container, making the app accessible.
     ports:
       - "3000:3000"
+    # Defines environment variables for the service.
+    # These are typically loaded from an external .env file (e.g., .env.samehost).
     environment:
-      - NODE_ENV=samehost
-      - MONGO_URI=mongodb://mongodb:27017/auth_db
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
-      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
-      - EMAIL_HOST=mailhog
-      - EMAIL_PORT=1025
-      - EMAIL_USER=${EMAIL_USER}
-      - EMAIL_PASS=${EMAIL_PASS}
-      - EMAIL_FROM=${EMAIL_FROM}
-      - PASSWORD_RESET_EXPIRES_IN=${PASSWORD_RESET_EXPIRES_IN}
-      - VERIFICATION_CODE_EXPIRES_IN=${VERIFICATION_CODE_EXPIRES_IN}
-      - HOST_URL=${HOST_URL}
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      - PORT=3000
-      - LOG_LEVEL=${LOG_LEVEL}
+      - NODE_ENV=samehost  # Sets the application environment to 'samehost'.
+      - MONGO_URI=mongodb://mongodb:27017/auth_db  # Connection string for the MongoDB service.
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}  # JWT secret for access tokens.
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}  # JWT secret for refresh tokens.
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}  # Expiration for access tokens.
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}  # Expiration for refresh tokens.
+      - EMAIL_HOST=mailhog  # Specifies the email service host (MailHog).
+      - EMAIL_PORT=1025  # Port for the MailHog SMTP server.
+      - EMAIL_USER=${EMAIL_USER}  # Email username (if any).
+      - EMAIL_PASS=${EMAIL_PASS}  # Email password (if any).
+      - EMAIL_FROM=${EMAIL_FROM}  # Default "from" address for emails.
+      - PASSWORD_RESET_EXPIRES_IN=${PASSWORD_RESET_EXPIRES_IN}  # Expiration for password reset tokens.
+      - VERIFICATION_CODE_EXPIRES_IN=${VERIFICATION_CODE_EXPIRES_IN}  # Expiration for verification codes.
+      - HOST_URL=${HOST_URL}  # Publicly accessible URL of the host.
+      - CORS_ORIGIN=${CORS_ORIGIN}  # Allowed origins for Cross-Origin Resource Sharing.
+      - PORT=3000  # The port the application will listen on inside the container.
+      - LOG_LEVEL=${LOG_LEVEL}  # Logging level for the application.
+    # Defines dependencies. This service will start after 'mongodb' and 'mailhog' are started.
     depends_on:
       - mongodb
       - mailhog
+    # Connects the service to the 'auth-network'.
     networks:
       - auth-network
+    # Configures the restart policy. 'unless-stopped' restarts the container unless it was manually stopped.
     restart: unless-stopped
+    # Overrides the default command for the container.
     command: npm run start
 
-  # MongoDB service for samehost development
+  # Defines the MongoDB database service.
   mongodb:
-    image: mongo:6.0
-    container_name: auth-mongodb-samehost
+    image: mongo:6.0  # Uses the official MongoDB version 6.0 image.
+    container_name: auth-mongodb-samehost  # Custom name for the MongoDB container.
+    # Maps port 27017 on the host to port 27017 in the container for direct database access.
     ports:
       - "27017:27017"
+    # Mounts a named volume to persist database data across container restarts.
     volumes:
       - mongodb-samehost-data:/data/db
+    # Sets environment variables for the MongoDB container.
     environment:
-      - MONGO_INITDB_DATABASE=auth_db
+      - MONGO_INITDB_DATABASE=auth_db  # Creates a database named 'auth_db' on initialization.
+    # Connects the service to the 'auth-network'.
     networks:
       - auth-network
+    # Defines a health check to ensure the database is running and responsive.
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]  # Command to check database status.
+      interval: 10s  # Time between health checks.
+      timeout: 5s  # Time to wait for a response.
+      retries: 5  # Number of retries on failure.
+      start_period: 5s  # Grace period for the container to start before checking.
 
-  # MailHog for email testing
+  # Defines the MailHog service for capturing and viewing emails during development.
   mailhog:
-    image: mailhog/mailhog:latest
-    container_name: auth-mailhog-samehost
+    image: mailhog/mailhog:latest  # Uses the latest official MailHog image.
+    container_name: auth-mailhog-samehost  # Custom name for the MailHog container.
+    # Maps ports for the SMTP server and the web UI.
     ports:
-      - "1025:1025"  # SMTP server port
-      - "8025:8025"  # Web UI port
+      - "1025:1025"  # SMTP server port that the auth-service will connect to.
+      - "8025:8025"  # Web UI port to view captured emails (accessible at http://localhost:8025).
+    # Connects the service to the 'auth-network'.
     networks:
       - auth-network
+    # Ensures the service restarts if it goes down.
     restart: unless-stopped
+
+# Defines the custom network for communication between services.
 networks:
   auth-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 10.10.11.0/24
-          gateway: 10.10.11.1
+    driver: bridge  # Use the standard bridge network driver.
+    # Configures a custom IP Address Management (IPAM) scheme for the network.
+    # ipam:
+    #   config:
+    #     - subnet: 10.10.11.0/24  # Defines the subnet for the network.
+    #       gateway: 10.10.11.1  # Defines the gateway for the subnet.
 
+# Defines the named volume for persisting MongoDB data.
 volumes:
-  mongodb-samehost-data:
+  mongodb-samehost-data:  # This ensures that database data is not lost when the container is removed or rebuilt.

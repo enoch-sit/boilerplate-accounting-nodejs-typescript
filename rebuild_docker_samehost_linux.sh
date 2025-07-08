@@ -70,17 +70,18 @@ if [ -z "$JWT_ACCESS_SECRET" ] || [ "$JWT_ACCESS_SECRET" = "your-super-secret-jw
     echo "⚠️ Warning: Default JWT secrets detected. Please update them for security!"
 fi
 
-# Stop and remove existing containers
-echo "🛑 Stopping existing containers..."
-docker compose -f docker-compose.samehost.yml down
+# Stop and remove existing containers, volumes, and network
+echo "🛑 Stopping and cleaning up existing containers, volumes, and network..."
+docker compose -f docker-compose.samehost.yml down --volumes
 
 # Remove existing images to force rebuild
 echo "🗑️ Removing existing images..."
+docker compose -f docker-compose.samehost.yml build --no-cache
 docker compose -f docker-compose.samehost.yml down --rmi all
 
-# Remove unused volumes (optional - uncomment if you want to reset data)
-# echo "🗑️ Removing unused volumes..."
-# docker volume prune -f
+# Prune unused networks just in case
+echo "🌐 Pruning unused networks..."
+docker network prune -f
 
 # Build and start containers
 echo "🏗️ Building and starting containers..."
