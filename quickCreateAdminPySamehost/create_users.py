@@ -24,7 +24,7 @@ PROGRESS_INTERVAL = 10  # Show progress every N users
 ADMIN_USER = {
     "username": "admin",
     "email": "admin@example.com",
-    "password": "admin@admin@aidcec", # Please change this
+    "password": "admin@admin@aidcec",  # Please change this
 }
 SUPERVISOR_USERS = [
     {
@@ -46,7 +46,8 @@ REGULAR_USERS = [
         "email": f"user{i:02d}@aidcec.com",
         "password": f"User{i:02d}@aidcec",
         "role": "enduser",
-    } for i in range(1,101)
+    }
+    for i in range(1, 3)
 ]
 
 # Log file setup
@@ -266,7 +267,9 @@ def create_user(user_data, token, role_name, max_retries=3):
             if response.status_code == 201:
                 data = response.json()
                 user_id = data.get("userId")
-                print(f"✅ {role_name} created: {user_data['username']} (ID: {user_id})")
+                print(
+                    f"✅ {role_name} created: {user_data['username']} (ID: {user_id})"
+                )
                 # Log the user creation
                 log_user_creation(
                     role_name,
@@ -294,7 +297,7 @@ def create_user(user_data, token, role_name, max_retries=3):
             else:
                 print(f"❌ {error_msg} (Final attempt)")
                 return None
-    
+
     return None
 
 
@@ -331,23 +334,23 @@ def main():
     failed_supervisors = []
     for supervisor in SUPERVISOR_USERS:
         if not create_user(supervisor, admin_token, "Supervisor"):
-            failed_supervisors.append(supervisor['username'])
+            failed_supervisors.append(supervisor["username"])
         time.sleep(USER_CREATION_DELAY)  # Small delay between supervisor creations
 
     # Create regular users
     print("\n--- Creating regular users ---")
     total_users = len(REGULAR_USERS)
     print(f"📊 Creating {total_users} regular users...")
-    
+
     failed_users = []
     for i, user in enumerate(REGULAR_USERS, 1):
         if not create_user(user, admin_token, "Regular user"):
-            failed_users.append(user['username'])
-        
+            failed_users.append(user["username"])
+
         # Add a small delay between user creations
         if i < total_users:  # Don't sleep after the last user
             time.sleep(USER_CREATION_DELAY)
-            
+
         # Progress indicator for large batches
         if i % PROGRESS_INTERVAL == 0:
             print(f"📊 Progress: {i}/{total_users} users created")
@@ -355,28 +358,32 @@ def main():
 
     print("\n✨ User setup completed!")
     print(f"\nCredential log saved to: {LOG_PATH}")
-    
+
     # Summary of results
     print("\n📊 Creation Summary:")
     print(f"✅ Admin: 1 user")
-    print(f"✅ Supervisors: {len(SUPERVISOR_USERS) - len(failed_supervisors)}/{len(SUPERVISOR_USERS)} users")
-    print(f"✅ Regular users: {len(REGULAR_USERS) - len(failed_users)}/{len(REGULAR_USERS)} users")
-    
+    print(
+        f"✅ Supervisors: {len(SUPERVISOR_USERS) - len(failed_supervisors)}/{len(SUPERVISOR_USERS)} users"
+    )
+    print(
+        f"✅ Regular users: {len(REGULAR_USERS) - len(failed_users)}/{len(REGULAR_USERS)} users"
+    )
+
     if failed_supervisors:
         print(f"\n❌ Failed supervisor creations: {', '.join(failed_supervisors)}")
-    
+
     if failed_users:
         print(f"\n❌ Failed user creations: {', '.join(failed_users)}")
         if len(failed_users) > 10:
             print(f"   ... and {len(failed_users) - 10} more")
-    
+
     print("\nCreated accounts:")
     print(f"- Admin: {ADMIN_USER['username']} / {ADMIN_USER['password']}")
     for supervisor in SUPERVISOR_USERS:
-        if supervisor['username'] not in failed_supervisors:
+        if supervisor["username"] not in failed_supervisors:
             print(f"- Supervisor: {supervisor['username']} / {supervisor['password']}")
     for user in REGULAR_USERS:
-        if user['username'] not in failed_users:
+        if user["username"] not in failed_users:
             print(f"- User: {user['username']} / {user['password']}")
             break  # Only show first successful user, not all 100
 
